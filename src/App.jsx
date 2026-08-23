@@ -1,12 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { ROADS, ROAD_NAMES } from "./roads.js";
-import {
-  ROAD_PM25,
-  lookupPM25,
-  getPM25Risk,
-  calcExposureScore,
-  getScoreRisk,
-} from "./air.js";
+import { ROAD_PM25, lookupPM25, getPM25Risk } from "./air.js";
 import {
   computeSourceDistances,
   closestPerCategory,
@@ -26,6 +20,7 @@ import { lookupOneHealthLayers } from "./oneHealthGrids.js";
 import { findWard } from "./wards.js";
 import { MapView } from "./MapView.jsx";
 import { OneHealthCard } from "./OneHealthCard.jsx";
+import { color, font, card, inp, eyebrow, buttonPrimary, topographicSvgDataUri } from "./theme.js";
 
 // ── Geometry (road-specific: point-to-segment) ────────────────────────
 function haversine(a, b, c, d) {
@@ -78,25 +73,6 @@ function parseCoord(s) {
   return { lat: a, lng: b };
 }
 
-const card = {
-  background: "#fff",
-  border: "1px solid #E5E7EB",
-  borderRadius: 14,
-  padding: "1rem 1.2rem",
-};
-const inp = {
-  width: "100%",
-  padding: "10px 13px",
-  fontSize: 14,
-  border: "1px solid #E5E7EB",
-  borderRadius: 9,
-  background: "#FAFAFA",
-  color: "#111",
-  outline: "none",
-  fontFamily: "inherit",
-  boxSizing: "border-box",
-};
-
 export default function App() {
   const [coord, setCoord] = useState("");
   const [name, setName] = useState("");
@@ -123,7 +99,6 @@ export default function App() {
     const minDist = Math.min(...dists.map((d) => d.dist));
     const closest = dists.reduce((a, b) => (a.dist < b.dist ? a : b));
     const pm25 = lookupPM25(p.lat, p.lng);
-    const score = calcExposureScore(minDist, pm25);
 
     const sourceDists = computeSourceDistances(p.lat, p.lng);
     const closestByCat = closestPerCategory(sourceDists);
@@ -139,7 +114,6 @@ export default function App() {
       minDist,
       closest,
       pm25,
-      score,
       patientName: name.trim(),
       timestamp: new Date().toLocaleString("en-US"),
       sourceDists,
@@ -179,80 +153,106 @@ export default function App() {
   const ok = parseCoord(coord);
   const roadRk = result ? getRoadRisk(result.minDist) : null;
   const pm25Rk = result ? getPM25Risk(result.pm25) : null;
-  const scoreRk = result ? getScoreRisk(result.score) : null;
 
   return (
     <div
       style={{
-        padding: "1.25rem 0.75rem",
-        fontFamily: "'DM Sans','Segoe UI',sans-serif",
+        fontFamily: font.body,
         maxWidth: 820,
         margin: "0 auto",
         fontSize: 13,
-        color: "#111",
+        color: color.ink,
+        paddingBottom: "2rem",
       }}
     >
-      {/* Header */}
+      {/* Header — deep-forest banner with a topographic contour signature */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 11,
-          marginBottom: 14,
+          background: `linear-gradient(160deg, ${color.forest} 0%, #16302A 100%)`,
+          backgroundImage: `${topographicSvgDataUri()}, linear-gradient(160deg, ${color.forest} 0%, #16302A 100%)`,
+          backgroundSize: "480px auto, cover",
+          backgroundRepeat: "repeat, no-repeat",
+          padding: "1.4rem 0.9rem 1.6rem",
+          marginBottom: "1.1rem",
         }}
       >
         <div
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: 11,
-            background: "#FEF2F2",
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
+            gap: 12,
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M8 1.5L2 13.5h12L8 1.5z"
-              stroke="#9B1C1C"
-              strokeWidth="1.4"
-              fill="none"
-              strokeLinejoin="round"
-            />
-            <line
-              x1="8"
-              y1="6"
-              x2="8"
-              y2="9.5"
-              stroke="#9B1C1C"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-            />
-            <circle cx="8" cy="11.5" r="0.8" fill="#9B1C1C" />
-          </svg>
-        </div>
-        <div>
-          <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 2px" }}>
-            One Health Exposure Explorer — HCMC
-          </h2>
-          <p style={{ fontSize: 11, color: "#9CA3AF", margin: 0 }}>
-            {ROAD_NAMES.length} roads · {SOURCES.length.toLocaleString()} OSM sources ·
-            168 wards · Air/Land/Water/Animal layers · Open-Meteo climate
-          </p>
+          <div
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 10,
+              background: "rgba(255,255,255,0.1)",
+              border: "1px solid rgba(255,255,255,0.18)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 21c4.5-4.2 7-7.7 7-11a7 7 0 10-14 0c0 3.3 2.5 6.8 7 11z"
+                stroke="#EAF3EC"
+                strokeWidth="1.4"
+                fill="none"
+              />
+              <circle cx="12" cy="10" r="2.6" stroke="#EAF3EC" strokeWidth="1.4" />
+            </svg>
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: 9.5,
+                fontWeight: 600,
+                color: "#A7C4AE",
+                textTransform: "uppercase",
+                letterSpacing: "0.14em",
+                fontFamily: font.mono,
+                marginBottom: 2,
+              }}
+            >
+              Field Exposure Station · HCMC
+            </div>
+            <h1
+              style={{
+                fontFamily: font.display,
+                fontSize: 22,
+                fontWeight: 600,
+                color: "#F7F6EF",
+                margin: 0,
+                letterSpacing: "-0.01em",
+              }}
+            >
+              One Health Exposure Explorer
+            </h1>
+            <p
+              style={{
+                fontSize: 11,
+                color: "#B7CBBB",
+                margin: "4px 0 0",
+                fontFamily: font.mono,
+              }}
+            >
+              {ROAD_NAMES.length} roads · {SOURCES.length.toLocaleString()}{" "}
+              OSM sources · 168 wards · air · land · water · animal layers
+            </p>
+          </div>
         </div>
       </div>
 
+      <div style={{ padding: "0 0.85rem" }}>
       {/* Input */}
       <div style={{ ...card, marginBottom: 12 }}>
         <label
           style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: "#3B82F6",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
+            ...eyebrow(color.forestSoft),
             display: "block",
             marginBottom: 8,
           }}
@@ -261,9 +261,12 @@ export default function App() {
           <span
             style={{
               fontWeight: 400,
-              color: "#9CA3AF",
+              color: color.inkFaint,
               fontSize: 10,
               marginLeft: 8,
+              textTransform: "none",
+              letterSpacing: "normal",
+              fontFamily: font.body,
             }}
           >
             right-click → click the coordinate line → paste
@@ -274,9 +277,9 @@ export default function App() {
             <input
               style={{
                 ...inp,
-                borderColor: coord ? "#3B82F6" : "#E5E7EB",
-                background: coord ? "#EFF6FF" : "#FAFAFA",
-                fontFamily: "monospace",
+                borderColor: coord ? color.sage : color.line,
+                background: coord ? color.sageMist : color.parchment,
+                fontFamily: font.mono,
                 fontSize: 14,
               }}
               placeholder="10.758773, 106.649111"
@@ -286,15 +289,15 @@ export default function App() {
               autoFocus
             />
             {!coord ? (
-              <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 5 }}>
+              <div style={{ fontSize: 10, color: color.inkFaint, marginTop: 5 }}>
                 Paste coordinates from Google Maps
               </div>
             ) : !ok ? (
-              <div style={{ fontSize: 10, color: "#EF4444", marginTop: 5 }}>
+              <div style={{ fontSize: 10, color: color.brick, marginTop: 5 }}>
                 ⚠ Not recognized — expected "lat, lng"
               </div>
             ) : (
-              <div style={{ fontSize: 10, color: "#166534", marginTop: 5 }}>
+              <div style={{ fontSize: 10, color: color.forestSoft, marginTop: 5 }}>
                 ✓ {ok.lat.toFixed(6)}, {ok.lng.toFixed(6)}
               </div>
             )}
@@ -303,17 +306,17 @@ export default function App() {
             <input
               style={{
                 ...inp,
-                borderColor: name ? "#8B5CF6" : "#E5E7EB",
-                background: name ? "#F5F3FF" : "#FAFAFA",
+                borderColor: name ? color.water : color.line,
+                background: name ? color.waterMist : color.parchment,
               }}
               placeholder="Patient name / Sample ID"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && doSearch()}
             />
-            <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 5 }}>
+            <div style={{ fontSize: 10, color: color.inkFaint, marginTop: 5 }}>
               {name ? (
-                <span style={{ color: "#7C3AED" }}>✓ {name}</span>
+                <span style={{ color: color.water }}>✓ {name}</span>
               ) : (
                 "Sample label"
               )}
@@ -323,17 +326,10 @@ export default function App() {
             onClick={doSearch}
             disabled={!ok || envLoading}
             style={{
-              height: 42,
-              padding: "0 22px",
-              fontSize: 13,
-              fontWeight: 700,
-              border: "none",
-              borderRadius: 9,
+              ...buttonPrimary,
               flexShrink: 0,
-              fontFamily: "inherit",
               whiteSpace: "nowrap",
-              background: ok && !envLoading ? "#111" : "#D1D5DB",
-              color: "#fff",
+              background: ok && !envLoading ? color.forest : "#D1D5DB",
               cursor: ok && !envLoading ? "pointer" : "not-allowed",
             }}
           >
@@ -345,8 +341,8 @@ export default function App() {
             style={{
               marginTop: 8,
               fontSize: 12,
-              color: "#9B1C1C",
-              background: "#FEF2F2",
+              color: color.brick,
+              background: color.brickMist,
               borderRadius: 7,
               padding: "7px 12px",
             }}
@@ -365,16 +361,16 @@ export default function App() {
             justifyContent: "space-between",
             marginBottom: 10,
             padding: "8px 14px",
-            background: "#F8FAFC",
+            background: color.sageMist,
             borderRadius: 9,
-            border: "1px solid #E5E7EB",
+            border: `1px solid ${color.line}`,
           }}
         >
-          <span style={{ fontSize: 12, color: "#6B7280" }}>
-            💾 <strong style={{ color: "#111" }}>{sessions.length}</strong>{" "}
+          <span style={{ fontSize: 12, color: color.inkSoft }}>
+            💾 <strong style={{ color: color.ink }}>{sessions.length}</strong>{" "}
             measurement{sessions.length !== 1 ? "s" : ""}
             {sessions.some((s) => s.patientName) && (
-              <span style={{ color: "#7C3AED", marginLeft: 8 }}>
+              <span style={{ color: color.water, marginLeft: 8 }}>
                 ·{" "}
                 {[
                   ...new Set(
@@ -397,10 +393,10 @@ export default function App() {
               fontWeight: 700,
               border: "none",
               borderRadius: 7,
-              background: "#166534",
+              background: color.forestSoft,
               color: "#fff",
               cursor: "pointer",
-              fontFamily: "inherit",
+              fontFamily: font.body,
             }}
           >
             ⬇ Export Excel ({sessions.length} case
@@ -433,8 +429,10 @@ export default function App() {
                 style={{
                   fontSize: 10,
                   fontWeight: 700,
-                  color: "#9CA3AF",
+                  color: color.inkFaint,
                   textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  fontFamily: font.mono,
                 }}
               >
                 Coordinates
@@ -444,7 +442,7 @@ export default function App() {
                   fontSize: 11,
                   fontWeight: 700,
                   lineHeight: 1.6,
-                  fontFamily: "monospace",
+                  fontFamily: font.mono,
                 }}
               >
                 {result.geo.lat.toFixed(5)}
@@ -453,7 +451,7 @@ export default function App() {
               </div>
               {result.patientName && (
                 <div
-                  style={{ fontSize: 10, color: "#7C3AED", fontWeight: 600 }}
+                  style={{ fontSize: 10, color: color.water, fontWeight: 600 }}
                 >
                   👤 {result.patientName}
                 </div>
@@ -472,8 +470,10 @@ export default function App() {
                 style={{
                   fontSize: 10,
                   fontWeight: 700,
-                  color: "#9CA3AF",
+                  color: color.inkFaint,
                   textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  fontFamily: font.mono,
                 }}
               >
                 Nearest Road
@@ -494,7 +494,7 @@ export default function App() {
               <div
                 style={{
                   fontSize: 10,
-                  color: "#6B7280",
+                  color: color.inkSoft,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
@@ -576,53 +576,45 @@ export default function App() {
             <div
               style={{
                 ...card,
-                background: scoreRk.bg,
-                border: `1px solid ${scoreRk.bar}33`,
+                background: color.clayMist,
+                border: `1px solid ${color.clay}33`,
                 display: "flex",
                 flexDirection: "column",
                 gap: 3,
               }}
             >
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: scoreRk.color,
-                  textTransform: "uppercase",
-                  opacity: 0.8,
-                }}
-              >
-                Exposure Score
+              <div style={{ ...eyebrow(color.clay), opacity: 0.85 }}>
+                Ward · Population
               </div>
               <div
                 style={{
-                  fontSize: 26,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: color.clay,
+                  lineHeight: 1.3,
+                }}
+              >
+                {result.ward ? result.ward.name : "Outside HCMC"}
+              </div>
+              <div
+                style={{
+                  fontSize: 20,
                   fontWeight: 800,
-                  color: scoreRk.color,
+                  color: color.clay,
                   lineHeight: 1,
+                  fontVariantNumeric: "tabular-nums",
                 }}
               >
-                {result.score}
-                <span style={{ fontSize: 12, fontWeight: 400 }}>/100</span>
+                {result.oneHealth?.population != null
+                  ? Math.round(result.oneHealth.population)
+                  : "–"}
+                <span style={{ fontSize: 11, fontWeight: 400, marginLeft: 3 }}>
+                  people / 100m cell
+                </span>
               </div>
-              <div style={{ fontSize: 10, color: scoreRk.color, opacity: 0.7 }}>
-                Traffic 60% · PM2.5 40%
+              <div style={{ fontSize: 10, color: color.clay, opacity: 0.7 }}>
+                WorldPop 2024, 100m grid
               </div>
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "2px 8px",
-                  borderRadius: 20,
-                  alignSelf: "flex-start",
-                  background: "rgba(255,255,255,0.6)",
-                  color: scoreRk.color,
-                  border: `1px solid ${scoreRk.bar}`,
-                  fontSize: 10,
-                  fontWeight: 700,
-                }}
-              >
-                {scoreRk.label}
-              </span>
             </div>
           </div>
 
@@ -697,8 +689,8 @@ export default function App() {
                       borderRadius: 7,
                       cursor: "pointer",
                       fontFamily: "inherit",
-                      background: tab === k ? "#111" : "#F3F4F6",
-                      color: tab === k ? "#fff" : "#6B7280",
+                      background: tab === k ? color.forest : color.sageMist,
+                      color: tab === k ? "#fff" : color.inkSoft,
                     }}
                   >
                     {lbl}
@@ -710,7 +702,7 @@ export default function App() {
                   onClick={() => setAsc((s) => !s)}
                   style={{
                     fontSize: 11,
-                    color: "#6B7280",
+                    color: color.inkSoft,
                     border: "1px solid #E5E7EB",
                     background: "#FAFAFA",
                     cursor: "pointer",
@@ -766,7 +758,7 @@ export default function App() {
                           textAlign: "left",
                           fontSize: 11,
                           fontWeight: 700,
-                          color: "#9CA3AF",
+                          color: color.inkFaint,
                           background: "#FAFAFA",
                           borderBottom: "1px solid #F3F4F6",
                           whiteSpace: "nowrap",
@@ -960,7 +952,7 @@ export default function App() {
                           <td
                             style={{
                               ...tdBase,
-                              color: "#9CA3AF",
+                              color: color.inkFaint,
                               fontSize: 12,
                             }}
                           >
@@ -1005,6 +997,7 @@ export default function App() {
           </p>
         </>
       )}
+      </div>
     </div>
   );
 }

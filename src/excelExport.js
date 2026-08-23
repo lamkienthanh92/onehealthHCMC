@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { ROAD_NAMES } from "./roads.js";
-import { ROAD_PM25, getPM25Risk, getScoreRisk } from "./air.js";
+import { ROAD_PM25, getPM25Risk } from "./air.js";
 import { SOURCE_CATS, SOURCES } from "./sourceUtils.js";
 import { lookupNDVI, lookupEVI, getNDVIClass } from "./ndvi.js";
 import { lookupOneHealthLayers, LANDCOVER_LABELS } from "./oneHealthGrids.js";
@@ -37,8 +37,6 @@ function buildPatientSheet(sessions) {
     "Min Distance (m)",
     "Home PM2.5 (µg/m³)",
     "PM2.5 Category",
-    "Exposure Score",
-    "Overall Risk",
     "Measured At",
     // Closest per category
     ...catKeys.flatMap((cat) => [
@@ -89,8 +87,6 @@ function buildPatientSheet(sessions) {
       s.minDist,
       s.pm25 ?? "N/A",
       getPM25Risk(s.pm25).label,
-      s.score,
-      getScoreRisk(s.score).label,
       s.timestamp,
       ...catKeys.flatMap((cat) => [
         stats[`${cat}_closest_dist`] ?? "N/A",
@@ -144,8 +140,6 @@ function buildPatientSheet(sessions) {
     { wch: 14 },
     { wch: 18 },
     { wch: 20 },
-    { wch: 14 },
-    { wch: 18 },
     { wch: 22 },
     ...catKeys.flatMap(() => [{ wch: 22 }, { wch: 30 }, { wch: 18 }]),
     { wch: 22 },

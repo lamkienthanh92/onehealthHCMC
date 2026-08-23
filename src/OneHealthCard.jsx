@@ -1,10 +1,9 @@
 import { GRID_META, LANDCOVER_LABELS } from "./oneHealthGrids.js";
+import { color, font, card as cardBase, eyebrow } from "./theme.js";
 
 const card = {
-  background: "#fff",
-  border: "1px solid #E5E7EB",
-  borderRadius: 14,
-  padding: "1rem 1.2rem",
+  ...cardBase,
+  borderLeft: `3px solid ${color.forestSoft}`,
 };
 
 function fmt(key, v) {
@@ -40,24 +39,16 @@ export function OneHealthCard({ oneHealth, ward, loading }) {
           marginBottom: 10,
         }}
       >
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: "#374151",
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-          }}
-        >
+        <div style={eyebrow(color.forestSoft)}>
           🌐 One Health Environmental Layers
         </div>
-        <div style={{ fontSize: 11, color: "#2563EB", fontWeight: 700 }}>
+        <div style={{ fontSize: 11, color: color.clay, fontWeight: 700, fontFamily: font.mono }}>
           {ward ? `📍 ${ward.name}` : "Ward: outside HCMC boundary data"}
         </div>
       </div>
 
       {loading || !oneHealth ? (
-        <div style={{ fontSize: 12, color: "#9CA3AF" }}>Loading…</div>
+        <div style={{ fontSize: 12, color: color.inkFaint }}>Loading…</div>
       ) : (
         <div
           style={{
@@ -72,16 +63,16 @@ export function OneHealthCard({ oneHealth, ward, loading }) {
               <div
                 key={key}
                 style={{
-                  border: "1px solid #F3F4F6",
+                  border: `1px solid ${color.line}`,
                   borderRadius: 10,
                   padding: "6px 10px",
-                  background: "#FAFAFA",
+                  background: color.parchment,
                 }}
               >
-                <div style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 600 }}>
+                <div style={{ fontSize: 10, color: color.inkFaint, fontWeight: 600, fontFamily: font.mono }}>
                   {icon} {meta.label.split("(")[0].trim()}
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: color.ink, fontFamily: font.mono }}>
                   {fmt(key, oneHealth[key])}
                   {oneHealth[key] !== null && key !== "landcover" && (
                     <span style={{ fontSize: 10, fontWeight: 400, marginLeft: 3 }}>
@@ -94,7 +85,7 @@ export function OneHealthCard({ oneHealth, ward, loading }) {
           })}
         </div>
       )}
-      <p style={{ fontSize: 9, color: "#D1D5DB", marginTop: 8, lineHeight: 1.6 }}>
+      <p style={{ fontSize: 9, color: color.inkFaint, marginTop: 8, lineHeight: 1.6 }}>
         Sources: Sentinel-5P TROPOMI 2025 (gas indices) · MODIS LST 2025 · VIIRS
         nightlights (12mo) · GHSL 2020 · JRC Global Surface Water 1984–2021 ·
         SRTM 30m · Dynamic World (12mo) · Hansen Global Forest Change 2000–2025 ·

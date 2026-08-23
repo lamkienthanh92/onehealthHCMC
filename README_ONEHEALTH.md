@@ -65,8 +65,27 @@ nhẹ (357KB). Hàm `findWard(lat, lng)` dùng point-in-polygon tự viết
 | `butcher` | 13 | butcher shop |
 
 ### 5. Excel export mở rộng — `src/excelExport.js`
-Sheet "Patient Results" giờ có thêm: tên phường, 12 cột One Health, và
-7 sheet mới (1 sheet/category mới) — tổng cộng 15 sheet theo category.
+Sheet "Patient Results" giờ có thêm: tên phường, 13 cột One Health (kể cả
+dân số), và 7 sheet mới (1 sheet/category mới) — tổng cộng 17 sheet.
+
+### 6. Bỏ "Exposure Score" — `src/air.js`
+Chỉ số tổng hợp cũ (0.6×khoảng cách + 0.4×PM2.5) là công thức tự đặt,
+không có cơ sở khoa học đã được kiểm chứng — đã xóa khỏi tính toán, giao
+diện, và Excel export. Thay vào đó, dùng trực tiếp các biến thô (khoảng
+cách, PM2.5, 13 lớp One Health) làm covariates trong mô hình thống kê của
+bạn — đây là khuyến nghị đã đưa ra từ đầu và giờ đã thực hiện triệt để.
+Thẻ thứ 4 trong lưới kết quả (trước là "Exposure Score") giờ hiển thị
+**Phường + mật độ dân số** — dữ liệu thật, không phải chỉ số tính toán.
+
+### 7. Giao diện — theme "Trạm quan trắc thực địa" (`src/theme.js`)
+Bảng màu đất/rừng/nước (forest green, clay brown, water teal) trên nền
+parchment thay vì trắng/xám mặc định; chữ số dùng IBM Plex Mono (cảm giác
+sổ ghi chép thực địa/máy đo), tiêu đề dùng Fraunces (serif có cá tính);
+banner đầu trang có hoa văn đường đồng mức (topographic contour) làm điểm
+nhấn thị giác — gợi liên tưởng bản đồ địa hình, đúng tinh thần "khoảng
+cách đến nguồn" mà cả app xoay quanh. Toàn bộ token màu/font tập trung ở
+`theme.js`, các component khác (`OneHealthCard.jsx`, `MapView.jsx`) import
+dùng chung để đồng bộ.
 
 ## Còn thiếu / cần làm tiếp (không tự ý làm vì thiếu dữ liệu hoặc quyết định thiết kế)
 
@@ -76,10 +95,8 @@ Sheet "Patient Results" giờ có thêm: tên phường, 12 cột One Health, v�
 - **Số liệu kinh tế-xã hội cấp phường** (nghèo, thu nhập, nhập cư) —
   không có nguồn mở công khai ở cấp phường tại VN, đã xác nhận ở các
   bước trước.
-- **Exposure Score** vẫn dùng công thức heuristic cũ (0.6 khoảng cách +
-  0.4 PM2.5) — chưa tích hợp 12 lớp mới vào công thức tổng hợp; nên để
-  nguyên dạng biến thô cho phân tích thống kê (khuyến nghị trước đó)
-  thay vì nhồi thêm vào 1 con số.
+- **Exposure Score đã bị xóa** (xem mục 6 ở trên) — không còn "vẫn dùng
+  công thức heuristic cũ" như ghi chú trước đây.
 - **Geo boundary khác** (`geoBoundaries-VNM-ADM1-all.zip`) — không dùng
   vì chỉ ở cấp tỉnh (ADM1), quá thô; đã ưu tiên dùng
   `vietnamese-provinces-database` (cấp phường) thay thế.

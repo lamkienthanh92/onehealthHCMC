@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { SOURCE_CATS } from "./sourceUtils.js";
+import { color } from "./theme.js";
 
 // Fix default marker icons (Leaflet + bundlers issue)
 delete L.Icon.Default.prototype._getIconUrl;
@@ -63,9 +64,10 @@ export function MapView({ point, sourceDists, ward, closestRoad }) {
       );
       latlngs.forEach((poly) => {
         L.polygon(poly, {
-          color: "#2563EB",
+          color: color.forestSoft,
           weight: 2,
-          fillOpacity: 0.05,
+          fillColor: color.sage,
+          fillOpacity: 0.08,
         })
           .addTo(group)
           .bindPopup(`<b>Phường/Xã:</b> ${ward.name}`);
@@ -107,7 +109,7 @@ export function MapView({ point, sourceDists, ward, closestRoad }) {
         width: "100%",
         height: 340,
         borderRadius: 14,
-        border: "1px solid #E5E7EB",
+        border: `1px solid ${color.line}`,
         overflow: "hidden",
       }}
     />

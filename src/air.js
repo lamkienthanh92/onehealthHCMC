@@ -612,40 +612,9 @@ export function getPM25Risk(pm25) {
     bar: "#EF4444",
   };
 }
-export function calcExposureScore(minDist, pm25) {
-  const t =
-    minDist === 0
-      ? 100
-      : minDist < 50
-      ? 100 - (minDist / 50) * 30
-      : minDist < 200
-      ? 70 - ((minDist - 50) / 150) * 40
-      : minDist < 500
-      ? 30 - ((minDist - 200) / 300) * 30
-      : 0;
-  const p =
-    pm25 === null ? 50 : Math.min(100, Math.max(0, ((pm25 - 15) / 25) * 100));
-  return Math.round(t * 0.6 + p * 0.4);
-}
-export function getScoreRisk(score) {
-  if (score >= 70)
-    return {
-      label: "High exposure",
-      color: "#9B1C1C",
-      bg: "#FEF2F2",
-      bar: "#EF4444",
-    };
-  if (score >= 40)
-    return {
-      label: "Moderate exposure",
-      color: "#92400E",
-      bg: "#FFFBEB",
-      bar: "#F59E0B",
-    };
-  return {
-    label: "Low exposure",
-    color: "#166534",
-    bg: "#F0FDF4",
-    bar: "#22C55E",
-  };
-}
+// NOTE: A composite "Exposure Score" (weighted blend of road distance +
+// PM2.5) previously lived here. It was removed — a single arbitrary-weighted
+// number (0.6 distance + 0.4 PM2.5) has no validated scientific basis and
+// risks being read as more authoritative than it is. Use the raw variables
+// (distance, PM2.5, and the One Health layers) directly in statistical
+// models instead of a pre-baked index.
