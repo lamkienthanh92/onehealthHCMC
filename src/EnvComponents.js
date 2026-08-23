@@ -1,60 +1,37 @@
 import { SOURCE_CATS } from "./sourceUtils.js";
 import { getNDVIClass } from "./ndvi.js";
+import { color, font, card as cardBase } from "./theme.js";
+import { CAT_ICON, IconChip, SectionHeader, StatusDot, TickGauge, Icon } from "./ui.jsx";
 
-const card = {
-  background: "#fff",
-  border: "1px solid #E5E7EB",
-  borderRadius: 14,
-  padding: "1rem 1.2rem",
-};
-const SECTION_LABEL = {
-  fontSize: 11,
-  fontWeight: 700,
-  color: "#374151",
-  textTransform: "uppercase",
-  letterSpacing: "0.05em",
-  marginBottom: 8,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-};
+const card = cardBase;
+
+function riskTint(dist, isGreen) {
+  if (isGreen) return dist < 200 ? color.forestSoft : dist < 500 ? color.sage : color.inkFaint;
+  return dist < 200 ? color.brick : dist < 500 ? color.amber : color.inkSoft;
+}
 
 function SourceRow({ source }) {
   const meta = SOURCE_CATS[source.cat];
   const dist = source.dist;
   const isGreen = source.cat === "park" || source.cat === "forest";
-  const distColor = isGreen
-    ? dist < 200
-      ? "#166534"
-      : dist < 500
-      ? "#15803D"
-      : "#6B7280"
-    : dist < 200
-    ? "#9B1C1C"
-    : dist < 500
-    ? "#92400E"
-    : "#374151";
+  const tint = riskTint(dist, isGreen);
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 8,
-        padding: "5px 0",
-        borderBottom: "1px solid #F9FAFB",
+        gap: 10,
+        padding: "7px 0",
+        borderBottom: `1px solid ${color.line}`,
       }}
     >
-      <span
-        style={{ fontSize: 14, width: 20, textAlign: "center", flexShrink: 0 }}
-      >
-        {meta.icon}
-      </span>
+      <IconChip iconName={CAT_ICON[source.cat]} tint={isGreen ? color.forestSoft : color.clay} size={26} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            fontSize: 11,
+            fontSize: 11.5,
             fontWeight: 600,
-            color: "#374151",
+            color: color.ink,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -62,18 +39,23 @@ function SourceRow({ source }) {
         >
           {source.name}
         </div>
-        <div style={{ fontSize: 10, color: "#9CA3AF" }}>{meta.desc}</div>
+        <div style={{ fontSize: 9.5, color: color.inkFaint, fontFamily: font.mono }}>
+          {meta.desc}
+        </div>
       </div>
-      <div
-        style={{
-          fontSize: 13,
-          fontWeight: 800,
-          color: distColor,
-          fontVariantNumeric: "tabular-nums",
-          flexShrink: 0,
-        }}
-      >
-        {dist.toLocaleString("en-US")} m
+      <div style={{ textAlign: "right", flexShrink: 0 }}>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: tint,
+            fontVariantNumeric: "tabular-nums",
+            fontFamily: font.mono,
+          }}
+        >
+          {dist.toLocaleString("en-US")}
+          <span style={{ fontSize: 10, fontWeight: 400 }}> m</span>
+        </div>
       </div>
     </div>
   );
@@ -86,48 +68,36 @@ function EmptyRow({ cat }) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 8,
-        padding: "5px 0",
-        borderBottom: "1px solid #F9FAFB",
+        gap: 10,
+        padding: "7px 0",
+        borderBottom: `1px solid ${color.line}`,
+        opacity: 0.55,
       }}
     >
-      <span style={{ fontSize: 14, width: 20, textAlign: "center" }}>
-        {meta.icon}
-      </span>
+      <IconChip iconName={CAT_ICON[cat]} tint={color.inkFaint} size={26} />
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 11, color: "#9CA3AF" }}>{meta.desc}</div>
+        <div style={{ fontSize: 10.5, color: color.inkFaint, fontFamily: font.mono }}>
+          {meta.desc}
+        </div>
       </div>
-      <div style={{ fontSize: 11, color: "#D1D5DB" }}>None found</div>
+      <div style={{ fontSize: 10.5, color: color.inkFaint, fontFamily: font.mono }}>
+        none found
+      </div>
     </div>
   );
 }
 
 // ── Pollution Sources Card ────────────────────────────────────────────
 export function PollutionSummaryCard({ closest }) {
-  const POLL_CATS = [
-    "industrial",
-    "market",
-    "landfill",
-    "wastewater",
-    "fuel",
-    "hospital",
-  ];
+  const POLL_CATS = ["industrial", "market", "landfill", "wastewater", "fuel", "hospital"];
   return (
     <div style={card}>
-      <div style={SECTION_LABEL}>
-        <span>🏭 Pollution Sources</span>
-      </div>
+      <SectionHeader iconName="factory" tint={color.clay} label="Pollution Sources" />
       {!closest ? (
-        <div style={{ fontSize: 11, color: "#D1D5DB" }}>
-          Will appear after measurement
-        </div>
+        <div style={{ fontSize: 11, color: color.inkFaint }}>Will appear after measurement</div>
       ) : (
         POLL_CATS.map((cat) =>
-          closest[cat] ? (
-            <SourceRow key={cat} source={closest[cat]} />
-          ) : (
-            <EmptyRow key={cat} cat={cat} />
-          )
+          closest[cat] ? <SourceRow key={cat} source={closest[cat]} /> : <EmptyRow key={cat} cat={cat} />
         )
       )}
     </div>
@@ -135,6 +105,56 @@ export function PollutionSummaryCard({ closest }) {
 }
 
 // ── Green Buffer + NDVI/EVI Card ──────────────────────────────────────
+function VegTile({ label, value, cls, range, min, max }) {
+  return (
+    <div
+      style={{
+        flex: 1,
+        background: color.parchment,
+        border: `1px solid ${color.line}`,
+        borderRadius: 10,
+        padding: "9px 11px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 9.5,
+            fontWeight: 700,
+            color: color.forestSoft,
+            fontFamily: font.mono,
+            letterSpacing: "0.05em",
+          }}
+        >
+          {label}
+        </span>
+        <span
+          style={{
+            fontSize: 18,
+            fontWeight: 700,
+            color: color.ink,
+            fontFamily: font.mono,
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {value != null ? value.toFixed(3) : "–"}
+        </span>
+      </div>
+      <div style={{ fontSize: 9.5, color: color.inkSoft, marginTop: 2 }}>{cls.label}</div>
+      <TickGauge value={value ?? min} min={min} max={max} tint={color.forestSoft} />
+      <div style={{ fontSize: 8.5, color: color.inkFaint, marginTop: 3, fontFamily: font.mono }}>
+        range {range}
+      </div>
+    </div>
+  );
+}
+
 export function GreenSummaryCard({ closest, ndvi, evi }) {
   const GREEN_CATS = ["park", "forest"];
   const ndviClass = getNDVIClass(ndvi);
@@ -142,196 +162,39 @@ export function GreenSummaryCard({ closest, ndvi, evi }) {
 
   return (
     <div style={card}>
-      <div style={SECTION_LABEL}>
-        <span>🌿 Green Buffer & Vegetation</span>
-      </div>
+      <SectionHeader iconName="tree" tint={color.forestSoft} label="Green Buffer & Vegetation" />
 
-      {/* OSM nearest green sources */}
       {!closest ? (
-        <div style={{ fontSize: 11, color: "#D1D5DB" }}>
-          Will appear after measurement
-        </div>
+        <div style={{ fontSize: 11, color: color.inkFaint }}>Will appear after measurement</div>
       ) : (
         GREEN_CATS.map((cat) =>
-          closest[cat] ? (
-            <SourceRow key={cat} source={closest[cat]} />
-          ) : (
-            <EmptyRow key={cat} cat={cat} />
-          )
+          closest[cat] ? <SourceRow key={cat} source={closest[cat]} /> : <EmptyRow key={cat} cat={cat} />
         )
       )}
 
-      {/* NDVI / EVI divider */}
-      <div
-        style={{
-          margin: "10px 0 6px",
-          borderTop: "1px solid #F3F4F6",
-          paddingTop: 8,
-        }}
-      >
+      <div style={{ margin: "12px 0 0" }}>
         <div
           style={{
-            fontSize: 10,
+            fontSize: 9.5,
             fontWeight: 700,
-            color: "#9CA3AF",
+            color: color.inkFaint,
             textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            marginBottom: 6,
+            letterSpacing: "0.06em",
+            fontFamily: font.mono,
+            marginBottom: 7,
           }}
         >
           Satellite Vegetation Index · MODIS 2020–2024
         </div>
 
         {ndvi === null && evi === null ? (
-          <div style={{ fontSize: 11, color: "#D1D5DB" }}>
+          <div style={{ fontSize: 11, color: color.inkFaint }}>
             No satellite data at this location
           </div>
         ) : (
-          <div style={{ display: "flex", gap: 12 }}>
-            {/* NDVI */}
-            <div
-              style={{
-                flex: 1,
-                background: ndviClass.bg,
-                borderRadius: 8,
-                padding: "8px 10px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 10,
-                  color: ndviClass.color,
-                  fontWeight: 700,
-                  marginBottom: 2,
-                }}
-              >
-                NDVI
-              </div>
-              <div
-                style={{
-                  fontSize: 22,
-                  fontWeight: 800,
-                  color: ndviClass.color,
-                  lineHeight: 1,
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {ndvi != null ? ndvi.toFixed(3) : "–"}
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: ndviClass.color,
-                  opacity: 0.8,
-                  marginTop: 3,
-                }}
-              >
-                {ndviClass.label}
-              </div>
-              {/* NDVI bar */}
-              <div
-                style={{
-                  marginTop: 5,
-                  height: 4,
-                  background: "rgba(0,0,0,0.1)",
-                  borderRadius: 2,
-                }}
-              >
-                <div
-                  style={{
-                    width: `${Math.max(
-                      0,
-                      Math.min(100, (((ndvi ?? 0) + 0.2) / 1.2) * 100)
-                    )}%`,
-                    height: 4,
-                    borderRadius: 2,
-                    background: ndviClass.bar,
-                  }}
-                />
-              </div>
-              <div
-                style={{
-                  fontSize: 9,
-                  color: ndviClass.color,
-                  opacity: 0.6,
-                  marginTop: 2,
-                }}
-              >
-                range –0.2 to 1.0
-              </div>
-            </div>
-
-            {/* EVI */}
-            <div
-              style={{
-                flex: 1,
-                background: eviClass.bg,
-                borderRadius: 8,
-                padding: "8px 10px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 10,
-                  color: eviClass.color,
-                  fontWeight: 700,
-                  marginBottom: 2,
-                }}
-              >
-                EVI
-              </div>
-              <div
-                style={{
-                  fontSize: 22,
-                  fontWeight: 800,
-                  color: eviClass.color,
-                  lineHeight: 1,
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {evi != null ? evi.toFixed(3) : "–"}
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: eviClass.color,
-                  opacity: 0.8,
-                  marginTop: 3,
-                }}
-              >
-                {eviClass.label}
-              </div>
-              <div
-                style={{
-                  marginTop: 5,
-                  height: 4,
-                  background: "rgba(0,0,0,0.1)",
-                  borderRadius: 2,
-                }}
-              >
-                <div
-                  style={{
-                    width: `${Math.max(
-                      0,
-                      Math.min(100, (((evi ?? 0) + 0.1) / 0.7) * 100)
-                    )}%`,
-                    height: 4,
-                    borderRadius: 2,
-                    background: eviClass.bar,
-                  }}
-                />
-              </div>
-              <div
-                style={{
-                  fontSize: 9,
-                  color: eviClass.color,
-                  opacity: 0.6,
-                  marginTop: 2,
-                }}
-              >
-                range –0.1 to 0.6
-              </div>
-            </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <VegTile label="NDVI" value={ndvi} cls={ndviClass} range="–0.2 to 1.0" min={-0.2} max={1.0} />
+            <VegTile label="EVI" value={evi} cls={eviClass} range="–0.1 to 0.6" min={-0.1} max={0.6} />
           </div>
         )}
       </div>
@@ -340,50 +203,44 @@ export function GreenSummaryCard({ closest, ndvi, evi }) {
 }
 
 // ── Climate Card ──────────────────────────────────────────────────────
-function ClimateStat({ label, value, unit, sub }) {
+function ClimateStat({ iconName, label, value, unit, sub }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 2,
-        minWidth: 80,
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 90, flex: 1 }}>
       <div
         style={{
-          fontSize: 10,
-          color: "#9CA3AF",
-          fontWeight: 600,
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          fontSize: 9.5,
+          color: color.inkFaint,
+          fontWeight: 700,
           textTransform: "uppercase",
           letterSpacing: "0.05em",
-          textAlign: "center",
+          fontFamily: font.mono,
         }}
       >
+        <Icon name={iconName} size={11} color={color.water} />
         {label}
       </div>
       <div
         style={{
-          fontSize: 22,
-          fontWeight: 800,
-          color: "#111",
+          fontSize: 21,
+          fontWeight: 700,
+          color: color.ink,
           lineHeight: 1,
+          fontFamily: font.mono,
           fontVariantNumeric: "tabular-nums",
         }}
       >
         {value ?? "–"}
         {value != null && unit && (
-          <span style={{ fontSize: 10, fontWeight: 400, marginLeft: 2 }}>
+          <span style={{ fontSize: 10, fontWeight: 400, marginLeft: 2, color: color.inkSoft }}>
             {unit}
           </span>
         )}
       </div>
-      {sub && (
-        <div style={{ fontSize: 9, color: "#9CA3AF", textAlign: "center" }}>
-          {sub}
-        </div>
-      )}
+      <div style={{ height: 2, width: 24, background: color.water, borderRadius: 2 }} />
+      {sub && <div style={{ fontSize: 9, color: color.inkFaint }}>{sub}</div>}
     </div>
   );
 }
@@ -391,61 +248,30 @@ function ClimateStat({ label, value, unit, sub }) {
 export function ClimateCard({ climate, loading }) {
   return (
     <div style={{ ...card, marginBottom: 12 }}>
-      <div style={{ ...SECTION_LABEL, marginBottom: 10 }}>
-        <span>🌡️ Climate Normal at Location</span>
-        <span style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 400 }}>
-          Open-Meteo · 5-year mean 2020–2024 · per-coordinate
-        </span>
-      </div>
+      <SectionHeader
+        iconName="thermo"
+        tint={color.water}
+        label="Climate Normal at Location"
+        caption="Open-Meteo · 5yr mean 2020–2024"
+      />
       {loading ? (
-        <div style={{ fontSize: 11, color: "#9CA3AF" }}>
+        <div style={{ fontSize: 11, color: color.inkFaint }}>
           Fetching 5-year climate data… (may take 5–10 s)
         </div>
       ) : climate ? (
         <>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-around",
-              flexWrap: "wrap",
-              gap: 16,
-              padding: "4px 0 8px",
-            }}
-          >
-            <ClimateStat
-              label="Avg Temp"
-              value={climate.tempMean}
-              unit="°C"
-              sub="annual mean"
-            />
-            <ClimateStat
-              label="Avg Humidity"
-              value={climate.humidityMean}
-              unit="%"
-              sub="annual mean"
-            />
-            <ClimateStat
-              label="Avg Wind"
-              value={climate.windMean}
-              unit="m/s"
-              sub="annual mean"
-            />
-            <ClimateStat
-              label="Annual Rain"
-              value={climate.precipAnnual}
-              unit="mm"
-              sub="avg per year"
-            />
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 18, padding: "2px 0 8px" }}>
+            <ClimateStat iconName="thermo" label="Avg Temp" value={climate.tempMean} unit="°C" sub="annual mean" />
+            <ClimateStat iconName="droplet" label="Avg Humidity" value={climate.humidityMean} unit="%" sub="annual mean" />
+            <ClimateStat iconName="wind" label="Avg Wind" value={climate.windMean} unit="m/s" sub="annual mean" />
+            <ClimateStat iconName="cloudRain" label="Annual Rain" value={climate.precipAnnual} unit="mm" sub="avg / year" />
           </div>
-          <div style={{ fontSize: 10, color: "#D1D5DB", marginTop: 4 }}>
-            Based on {climate.nDays.toLocaleString()} daily records (
-            {climate.period}) at this coordinate
+          <div style={{ fontSize: 9.5, color: color.inkFaint, marginTop: 4, fontFamily: font.mono }}>
+            Based on {climate.nDays.toLocaleString()} daily records ({climate.period}) at this coordinate
           </div>
         </>
       ) : (
-        <div style={{ fontSize: 11, color: "#D1D5DB" }}>
-          Will appear after measurement
-        </div>
+        <div style={{ fontSize: 11, color: color.inkFaint }}>Will appear after measurement</div>
       )}
     </div>
   );

@@ -21,6 +21,7 @@ import { findWard } from "./wards.js";
 import { MapView } from "./MapView.jsx";
 import { OneHealthCard } from "./OneHealthCard.jsx";
 import { color, font, card, inp, eyebrow, buttonPrimary, topographicSvgDataUri } from "./theme.js";
+import { Readout, IconChip, SectionHeader, StatusDot, Icon, CAT_ICON } from "./ui.jsx";
 
 // ── Geometry (road-specific: point-to-segment) ────────────────────────
 function haversine(a, b, c, d) {
@@ -417,205 +418,43 @@ export default function App() {
               marginBottom: 12,
             }}
           >
-            <div
-              style={{
-                ...card,
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: color.inkFaint,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  fontFamily: font.mono,
-                }}
-              >
-                Coordinates
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  lineHeight: 1.6,
-                  fontFamily: font.mono,
-                }}
-              >
-                {result.geo.lat.toFixed(5)}
-                <br />
-                {result.geo.lng.toFixed(5)}
-              </div>
-              {result.patientName && (
-                <div
-                  style={{ fontSize: 10, color: color.water, fontWeight: 600 }}
-                >
-                  👤 {result.patientName}
-                </div>
-              )}
-            </div>
-
-            <div
-              style={{
-                ...card,
-                display: "flex",
-                flexDirection: "column",
-                gap: 3,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: color.inkFaint,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  fontFamily: font.mono,
-                }}
-              >
-                Nearest Road
-              </div>
-              <div
-                style={{
-                  fontSize: 26,
-                  fontWeight: 800,
-                  lineHeight: 1,
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {result.minDist.toLocaleString("en-US")}
-                <span style={{ fontSize: 12, fontWeight: 400, marginLeft: 3 }}>
-                  m
-                </span>
-              </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: color.inkSoft,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {result.closest.name}
-              </div>
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "2px 8px",
-                  borderRadius: 20,
-                  alignSelf: "flex-start",
-                  background: roadRk.bg,
-                  color: roadRk.color,
-                  fontSize: 10,
-                  fontWeight: 700,
-                }}
-              >
-                {roadRk.label}
-              </span>
-            </div>
-
-            <div
-              style={{
-                ...card,
-                background: pm25Rk.bg,
-                border: `1px solid ${pm25Rk.bar}33`,
-                display: "flex",
-                flexDirection: "column",
-                gap: 3,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: pm25Rk.color,
-                  textTransform: "uppercase",
-                  opacity: 0.8,
-                }}
-              >
-                Home PM2.5
-              </div>
-              <div
-                style={{
-                  fontSize: 26,
-                  fontWeight: 800,
-                  color: pm25Rk.color,
-                  lineHeight: 1,
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {result.pm25 ?? "–"}
-                <span style={{ fontSize: 12, fontWeight: 400, marginLeft: 3 }}>
-                  µg/m³
-                </span>
-              </div>
-              <div style={{ fontSize: 10, color: pm25Rk.color, opacity: 0.7 }}>
-                NASA ACAG 2023
-              </div>
-              <span
-                style={{
-                  display: "inline-block",
-                  padding: "2px 8px",
-                  borderRadius: 20,
-                  alignSelf: "flex-start",
-                  background: "rgba(255,255,255,0.6)",
-                  color: pm25Rk.color,
-                  border: `1px solid ${pm25Rk.bar}`,
-                  fontSize: 10,
-                  fontWeight: 700,
-                }}
-              >
-                {pm25Rk.label}
-              </span>
-            </div>
-
-            <div
-              style={{
-                ...card,
-                background: color.clayMist,
-                border: `1px solid ${color.clay}33`,
-                display: "flex",
-                flexDirection: "column",
-                gap: 3,
-              }}
-            >
-              <div style={{ ...eyebrow(color.clay), opacity: 0.85 }}>
-                Ward · Population
-              </div>
-              <div
-                style={{
-                  fontSize: 15,
-                  fontWeight: 700,
-                  color: color.clay,
-                  lineHeight: 1.3,
-                }}
-              >
-                {result.ward ? result.ward.name : "Outside HCMC"}
-              </div>
-              <div
-                style={{
-                  fontSize: 20,
-                  fontWeight: 800,
-                  color: color.clay,
-                  lineHeight: 1,
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {result.oneHealth?.population != null
+            <Readout
+              iconName="ruler"
+              tint={color.forestSoft}
+              label="Coordinates"
+              value={`${result.geo.lat.toFixed(5)}, ${result.geo.lng.toFixed(5)}`}
+              meta={result.patientName ? `👤 ${result.patientName}` : null}
+            />
+            <Readout
+              iconName="ruler"
+              tint={roadRk.bar}
+              label="Nearest Road"
+              value={result.minDist.toLocaleString("en-US")}
+              unit="m"
+              meta={result.closest.name}
+              statusLabel={roadRk.label}
+            />
+            <Readout
+              iconName="cloudRain"
+              tint={pm25Rk.bar}
+              label="Home PM2.5"
+              value={result.pm25 ?? "–"}
+              unit="µg/m³"
+              meta="NASA ACAG 2023"
+              statusLabel={pm25Rk.label}
+            />
+            <Readout
+              iconName="ward"
+              tint={color.clay}
+              label="Ward · Population"
+              value={
+                result.oneHealth?.population != null
                   ? Math.round(result.oneHealth.population)
-                  : "–"}
-                <span style={{ fontSize: 11, fontWeight: 400, marginLeft: 3 }}>
-                  people / 100m cell
-                </span>
-              </div>
-              <div style={{ fontSize: 10, color: color.clay, opacity: 0.7 }}>
-                WorldPop 2024, 100m grid
-              </div>
-            </div>
+                  : "–"
+              }
+              unit="/ 100m cell"
+              meta={result.ward ? result.ward.name : "Outside HCMC"}
+            />
           </div>
 
           {/* Env cards */}
@@ -674,21 +513,23 @@ export default function App() {
             >
               <div style={{ display: "flex", gap: 6 }}>
                 {[
-                  ["traffic", "🚗 Distance"],
-                  ["pm25", "🌫 Road PM2.5"],
-                  ["sources", "🏭 All Sources"],
+                  ["traffic", "Distance"],
+                  ["pm25", "Road PM2.5"],
+                  ["sources", "All Sources"],
                 ].map(([k, lbl]) => (
                   <button
                     key={k}
                     onClick={() => setTab(k)}
                     style={{
-                      padding: "5px 12px",
-                      fontSize: 11,
+                      padding: "6px 13px",
+                      fontSize: 10.5,
                       fontWeight: 700,
                       border: "none",
                       borderRadius: 7,
                       cursor: "pointer",
-                      fontFamily: "inherit",
+                      fontFamily: font.mono,
+                      letterSpacing: "0.03em",
+                      textTransform: "uppercase",
                       background: tab === k ? color.forest : color.sageMist,
                       color: tab === k ? "#fff" : color.inkSoft,
                     }}
@@ -701,14 +542,14 @@ export default function App() {
                 <button
                   onClick={() => setAsc((s) => !s)}
                   style={{
-                    fontSize: 11,
+                    fontSize: 10.5,
                     color: color.inkSoft,
-                    border: "1px solid #E5E7EB",
-                    background: "#FAFAFA",
+                    border: `1px solid ${color.line}`,
+                    background: color.parchment,
                     cursor: "pointer",
-                    padding: "4px 10px",
+                    padding: "5px 11px",
                     borderRadius: 6,
-                    fontFamily: "inherit",
+                    fontFamily: font.mono,
                   }}
                 >
                   {asc ? "↑ Ascending" : "↓ Descending"}
@@ -759,8 +600,9 @@ export default function App() {
                           fontSize: 11,
                           fontWeight: 700,
                           color: color.inkFaint,
-                          background: "#FAFAFA",
-                          borderBottom: "1px solid #F3F4F6",
+                          background: color.parchment,
+                          borderBottom: `1px solid ${color.line}`,
+                          fontFamily: font.mono,
                           whiteSpace: "nowrap",
                         }}
                       >
@@ -826,7 +668,7 @@ export default function App() {
                                 style={{
                                   width: 60,
                                   height: 4,
-                                  background: "#F3F4F6",
+                                  background: color.line,
                                   borderRadius: 2,
                                   flexShrink: 0,
                                 }}
@@ -862,19 +704,7 @@ export default function App() {
                             </span>
                           </td>
                           <td style={tdBase}>
-                            <span
-                              style={{
-                                display: "inline-block",
-                                padding: "2px 8px",
-                                borderRadius: 20,
-                                background: rk.bg,
-                                color: rk.color,
-                                fontSize: 10,
-                                fontWeight: 700,
-                              }}
-                            >
-                              {rk.label}
-                            </span>
+                            <StatusDot label={rk.label} tint={rk.bar} />
                           </td>
                         </tr>
                       );
@@ -924,7 +754,7 @@ export default function App() {
                                 style={{
                                   width: 60,
                                   height: 4,
-                                  background: "#F3F4F6",
+                                  background: color.line,
                                   borderRadius: 2,
                                   flexShrink: 0,
                                 }}
@@ -959,19 +789,7 @@ export default function App() {
                             {r.dist.toLocaleString("en-US")} m
                           </td>
                           <td style={tdBase}>
-                            <span
-                              style={{
-                                display: "inline-block",
-                                padding: "2px 8px",
-                                borderRadius: 20,
-                                background: prk.bg,
-                                color: prk.color,
-                                fontSize: 10,
-                                fontWeight: 700,
-                              }}
-                            >
-                              {prk.short}
-                            </span>
+                            <StatusDot label={prk.short} tint={prk.bar} />
                           </td>
                         </tr>
                       );
@@ -985,7 +803,7 @@ export default function App() {
           <p
             style={{
               fontSize: 10,
-              color: "#D1D5DB",
+              color: color.inkFaint,
               marginTop: 8,
               lineHeight: 1.8,
             }}

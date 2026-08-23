@@ -77,15 +77,36 @@ bạn — đây là khuyến nghị đã đưa ra từ đầu và giờ đã th�
 Thẻ thứ 4 trong lưới kết quả (trước là "Exposure Score") giờ hiển thị
 **Phường + mật độ dân số** — dữ liệu thật, không phải chỉ số tính toán.
 
-### 7. Giao diện — theme "Trạm quan trắc thực địa" (`src/theme.js`)
-Bảng màu đất/rừng/nước (forest green, clay brown, water teal) trên nền
-parchment thay vì trắng/xám mặc định; chữ số dùng IBM Plex Mono (cảm giác
-sổ ghi chép thực địa/máy đo), tiêu đề dùng Fraunces (serif có cá tính);
-banner đầu trang có hoa văn đường đồng mức (topographic contour) làm điểm
-nhấn thị giác — gợi liên tưởng bản đồ địa hình, đúng tinh thần "khoảng
-cách đến nguồn" mà cả app xoay quanh. Toàn bộ token màu/font tập trung ở
-`theme.js`, các component khác (`OneHealthCard.jsx`, `MapView.jsx`) import
-dùng chung để đồng bộ.
+### 7. Giao diện — theme "Trạm quan trắc thực địa" (`src/theme.js`, `src/ui.jsx`)
+**Vòng 1** chỉ đổi mã màu — kết quả vẫn trông như form Bootstrap tô lại
+màu (đúng như phản hồi nhận được). **Vòng 2** dựng lại ngôn ngữ thị giác
+thật sự, tách thành bộ primitives dùng chung ở `src/ui.jsx`:
+
+- **Bộ icon SVG line-art tự vẽ** (`Icon`, `CAT_ICON`) — thay hết emoji lẫn
+  lộn bằng 1 style nhất quán (factory, basket, trash, droplet, fuel, cross,
+  tree, forest, cap, pill, paw, sprout, ball, knife, tap, thermo, wind,
+  cloudRain, leaf, ward, people, ruler...).
+- **`IconChip`** — icon đặt trong khối vuông bo góc màu nhạt (thay vì icon
+  trôi nổi không nền).
+- **`Readout`** — thẻ chỉ số kiểu "instrument panel": nền trắng, viền trên
+  dày 3px màu domain, số liệu IBM Plex Mono, không còn nền pastel phủ kín
+  kiểu form nhập liệu.
+- **`StatusDot`** — chấm tròn nhỏ + nhãn, thay toàn bộ badge pill nền đặc
+  (trông như Bootstrap alert) bằng phong cách chấm trạng thái tối giản.
+- **`SectionHeader`** — icon chip + nhãn mono uppercase + đường kẻ mảnh
+  kéo dài, thay tiêu đề section phẳng.
+- **`TickGauge`** — thanh đo NDVI/EVI dạng vạch chia (instrument dial)
+  thay progress bar phẳng kiểu web form.
+
+Áp dụng lại cho `EnvComponents.js` (Pollution Sources / Green Buffer /
+Climate), 4 thẻ chỉ số đầu trang trong `App.jsx`, và toàn bộ badge rủi ro
+trong bảng dữ liệu.
+
+**Giới hạn cần biết:** môi trường chỉnh sửa không có trình duyệt để xem
+trực tiếp — mọi thay đổi chỉ được kiểm tra ở mức cú pháp (bracket balance,
+import path, chạy thử logic JS) chứ chưa tự mắt xác nhận bố cục cuối cùng.
+Sau khi `npm start`, nếu chỗ nào chưa ổn, chụp màn hình gửi lại để chỉnh
+tiếp theo đúng cái thấy được, thay vì đoán mò thêm.
 
 ## Còn thiếu / cần làm tiếp (không tự ý làm vì thiếu dữ liệu hoặc quyết định thiết kế)
 
