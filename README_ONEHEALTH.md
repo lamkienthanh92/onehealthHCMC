@@ -132,3 +132,95 @@ src/
 ├── MapView.jsx           # Bản đồ Leaflet
 ├── OneHealthCard.jsx     # Thẻ tóm tắt 12 lớp môi trường
 ```
+
+## Vòng nâng cấp thứ 3 — 4 cách trình bày tốt hơn
+
+### 1. Thẻ mở rộng (expandable) — `PollutionSummaryCard`, `GreenSummaryCard`
+Bấm "▼ Show all nearby" ở góc thẻ Pollution Sources / Green Buffer → hiện
+top 5 nguồn gần nhất mỗi category (thay vì chỉ 1 nguồn gần nhất như trước),
+sắp xếp gần → xa.
+
+### 2. Heatmap trên bản đồ — `MapView.jsx`
+3 nút chuyển đổi phía trên bản đồ: None / Population / Pollution. Dùng
+`leaflet.heat`. Heatmap dân số dựng từ `POPULATION_GRID` (3.590/3.780 ô có
+dữ liệu); heatmap ô nhiễm dựng từ các điểm industrial/landfill/wastewater/
+fuel trong `SOURCES`.
+
+### 3. Nhiều ranh giới phường trong bản đồ — `wards.js: getNearbyWards()`
+Trước đây chỉ vẽ 1 phường chứa điểm đo. Giờ vẽ toàn bộ phường có bbox giao
+với khung ~2km quanh điểm (thường ra 15–25 phường), phường chứa điểm tô
+đậm liền nét, các phường lân cận vẽ nét đứt mờ làm bối cảnh.
+
+### 4. Biểu đồ dân số khi mở rộng — `OneHealthCard.jsx`, `populationStats.js`
+Bấm vào ô "Population" trong bảng One Health → hiện biểu đồ cột so sánh
+3 giá trị: tại điểm đo / trung bình phường / trung bình TP.HCM (dùng
+`recharts`).
+
+**Lưu ý dữ liệu quan trọng đã phát hiện khi làm tính năng này:** lưới dân
+số đã downsample xuống ~1,5km/ô (không phải 100m sát nghĩa như nhãn ban
+đầu ngụ ý) — nên nhiều phường nhỏ chỉ trùng đúng 1 ô lưới. App tự động
+phát hiện trường hợp này và hiển thị cảnh báo ngay trong biểu đồ ("based
+on only 1 grid point...") thay vì âm thầm trình bày như số liệu đáng tin.
+Nếu cần "trung bình phường" chính xác thật, phải tải lại `WorldPop` ở độ
+phân giải gốc 100m không downsample (file sẽ nặng hơn nhiều).
+
+## Vòng nâng cấp thứ 4 — Minh bạch nguồn dữ liệu ngay trong UI
+
+Trả lời câu hỏi trực tiếp: **dữ liệu đường phố (`roads.js`) có phải từ OSM
+không?** — Không xác nhận được 100%. File này có sẵn trong zip gốc bạn
+upload từ đầu dự án, không có comment ghi nguồn. Cấu trúc (tên đường tiếng
+Việt + polyline nhiều đoạn) giống OSM nhưng đây là suy luận, không phải
+bằng chứng. Đã ghi rõ mức độ tin cậy "low" cho dòng này trong bảng dưới.
+
+### Thêm mới:
+- **`DataSourcesTable.jsx`** — bảng đầy đủ 19 lớp dữ liệu (13 lớp One
+  Health + 6 lớp còn lại: đường, PM2.5, NDVI, 2 nhóm OSM, ranh giới
+  phường, khí hậu), mỗi dòng có Nguồn / Độ phân giải (gốc → hiển thị) /
+  Năm / Mức độ tin cậy (cao/trung bình/thấp). Hiện ở cuối trang kết quả,
+  mặc định thu gọn — bấm "Show full table" để xem đầy đủ.
+- **Hover tooltip** trên 4 thẻ chỉ số đầu trang và toàn bộ 13 ô One Health
+  — di chuột vào bất kỳ ô nào hiện ngay nguồn + độ phân giải, không cần
+  mở bảng riêng.
+- **Caption ngắn** trong tiêu đề "Pollution Sources" / "Green Buffer" ghi
+  rõ "OSM Overpass" / "OSM + MODIS ~1km".
+
+### Phát hiện thêm khi làm minh bạch:
+Tính chính xác độ phân giải hiển thị thật (đo trực tiếp từ khoảng cách
+giữa các điểm lưới, không chỉ suy luận) — **toàn bộ 10 lớp môi trường đều
+bị nén xuống 1,4–2km/ô khi hiển thị**, dù ảnh gốc mịn hơn nhiều (ví dụ
+Dynamic World gốc 10m → hiển thị ~1,5km, chênh lệch 150 lần). Đây là hệ
+quả trực tiếp của việc nén dữ liệu để giữ bundle JS nhẹ — đã ghi rõ cả 2
+con số (gốc và hiển thị) cho từng lớp thay vì chỉ nói chung chung "độ
+phân giải cao".
+
+## Vòng nâng cấp thứ 5 — Bỏ nén tùy tiện, dùng đúng độ phân giải dữ liệu cho phép
+
+Bạn hỏi thẳng: "sao nén xuống 1.4-2km trong khi có dữ liệu chính xác hơn
+mà không dùng?" — Đúng, lần trước mình chọn mức nén tùy tiện (target=35-60
+cho mọi lớp như nhau) mà không thực sự tính xem từng lớp *cần* nén đến đâu.
+Đã tính lại theo đúng độ phân giải gốc của từng nguồn:
+
+| Nhóm lớp | Độ phân giải gốc | Trước đây | Bây giờ |
+|---|---|---|---|
+| NO2, SO2, CO, O3, LST | ~1km | ~2km (nén 2x không cần thiết) | **~1km — giữ nguyên gốc, không nén** |
+| Night Lights | ~500m | ~2km (nén 4x không cần thiết) | **~500m — giữ nguyên gốc** |
+| Built-up, Water, Population | 100m | ~1.4-1.7km | **~300m** |
+| Elevation, Tree Cover, Forest Loss | 30m | ~1.8km | **~390m** |
+| Land Cover (Dynamic World) | 10m | ~1.5km | **~350m** |
+
+Bundle tăng từ 165KB → **~2.6MB** — chấp nhận được cho app nghiên cứu
+chạy local qua `npm start`, không phải web công khai cần tối ưu tải trang.
+
+**Kết quả đo được:** vấn đề "trung bình phường chỉ dựa trên 1 ô lưới"
+(cảnh báo ở vòng nâng cấp trước) đã cải thiện — thử lại phường Bến Thành,
+số ô lưới dân số trùng trong phường tăng từ **1 ô → 18 ô**, "trung bình
+phường" giờ mới thực sự là trung bình, không còn trùng khớp máy móc với
+giá trị tại 1 điểm đo.
+
+**Lỗi phát hiện thêm khi làm lại:** LST (nhiệt độ) trước đó bị áp công
+thức chuyển đổi Kelvin→Celsius **2 lần** (1 lần đã làm sẵn trong code
+Earth Engine lúc export, 1 lần lặp lại trong bước xử lý Python) — dữ liệu
+gốc thực ra đã là độ C sẵn (25–36°C, hợp lý cho HCMC). Đã sửa, không phát
+hiện dấu hiệu bug này ảnh hưởng đến quyết định trước đó vì giá trị vẫn
+"trông hợp lý" một cách tình cờ — nhắc để bạn biết luôn kiểm tra range giá
+trị thực tế, không chỉ tin vào code "chạy không lỗi".

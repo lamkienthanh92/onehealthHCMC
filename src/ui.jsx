@@ -245,12 +245,14 @@ export function StatusDot({ label, tint }) {
 }
 
 // ── Section header: icon chip + mono label + rule + optional caption ───
-export function SectionHeader({ iconName, tint = color.forestSoft, label, caption }) {
+export function SectionHeader({ iconName, tint = color.forestSoft, label, caption, toggle }) {
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
+        flexWrap: "wrap",
+        rowGap: 6,
         gap: 9,
         marginBottom: 11,
       }}
@@ -282,6 +284,7 @@ export function SectionHeader({ iconName, tint = color.forestSoft, label, captio
           {caption}
         </span>
       )}
+      {toggle}
     </div>
   );
 }
@@ -335,9 +338,10 @@ export function TickGauge({ value, min, max, tint, ticks = 6 }) {
 }
 
 // ── Metric readout: label / big mono number / thin accent rule ────────
-export function Readout({ iconName, tint, label, value, unit, meta, statusLabel }) {
+export function Readout({ iconName, tint, label, value, unit, meta, statusLabel, tooltip }) {
   return (
     <div
+      title={tooltip}
       style={{
         background: color.paper,
         border: `1px solid ${color.line}`,

@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { SOURCE_CATS } from "./sourceUtils.js";
 import { getNDVIClass } from "./ndvi.js";
 import { color, font, card as cardBase } from "./theme.js";
-import { CAT_ICON, IconChip, SectionHeader, StatusDot, TickGauge, Icon } from "./ui.jsx";
+import { CAT_ICON, IconChip, SectionHeader, TickGauge, Icon } from "./ui.jsx";
 
 const card = cardBase;
 
@@ -10,7 +11,29 @@ function riskTint(dist, isGreen) {
   return dist < 200 ? color.brick : dist < 500 ? color.amber : color.inkSoft;
 }
 
-function SourceRow({ source }) {
+function ExpandToggleBtn({ expanded, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        fontSize: 9.5,
+        fontFamily: font.mono,
+        fontWeight: 700,
+        color: color.forestSoft,
+        background: "none",
+        border: `1px solid ${color.line}`,
+        borderRadius: 6,
+        padding: "3px 8px",
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {expanded ? "▲ Show closest only" : "▼ Show all nearby"}
+    </button>
+  );
+}
+
+function SourceRow({ source, compact }) {
   const meta = SOURCE_CATS[source.cat];
   const dist = source.dist;
   const isGreen = source.cat === "park" || source.cat === "forest";
@@ -21,15 +44,19 @@ function SourceRow({ source }) {
         display: "flex",
         alignItems: "center",
         gap: 10,
-        padding: "7px 0",
+        padding: compact ? "4px 0" : "7px 0",
         borderBottom: `1px solid ${color.line}`,
       }}
     >
-      <IconChip iconName={CAT_ICON[source.cat]} tint={isGreen ? color.forestSoft : color.clay} size={26} />
+      <IconChip
+        iconName={CAT_ICON[source.cat]}
+        tint={isGreen ? color.forestSoft : color.clay}
+        size={compact ? 20 : 26}
+      />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            fontSize: 11.5,
+            fontSize: compact ? 10.5 : 11.5,
             fontWeight: 600,
             color: color.ink,
             overflow: "hidden",
@@ -39,14 +66,16 @@ function SourceRow({ source }) {
         >
           {source.name}
         </div>
-        <div style={{ fontSize: 9.5, color: color.inkFaint, fontFamily: font.mono }}>
-          {meta.desc}
-        </div>
+        {!compact && (
+          <div style={{ fontSize: 9.5, color: color.inkFaint, fontFamily: font.mono }}>
+            {meta.desc}
+          </div>
+        )}
       </div>
       <div style={{ textAlign: "right", flexShrink: 0 }}>
         <div
           style={{
-            fontSize: 13,
+            fontSize: compact ? 11.5 : 13,
             fontWeight: 700,
             color: tint,
             fontVariantNumeric: "tabular-nums",
@@ -87,18 +116,57 @@ function EmptyRow({ cat }) {
   );
 }
 
+// Sub-list shown when a category is expanded: top N nearest sites.
+function ExpandedCategoryList({ cat, sourceDists, n = 5 }) {
+  const items = (sourceDists || [])
+    .filter((s) => s.cat === cat)
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, n);
+  if (!items.length) return null;
+  return (
+    <div
+      style={{
+        marginLeft: 36,
+        marginBottom: 6,
+        paddingLeft: 10,
+        borderLeft: `2px solid ${color.line}`,
+      }}
+    >
+      {items.map((s, i) => (
+        <SourceRow key={`${s.lat},${s.lng},${i}`} source={s} compact />
+      ))}
+    </div>
+  );
+}
+
 // ── Pollution Sources Card ────────────────────────────────────────────
-export function PollutionSummaryCard({ closest }) {
+export function PollutionSummaryCard({ closest, sourceDists }) {
+  const [expanded, setExpanded] = useState(false);
   const POLL_CATS = ["industrial", "market", "landfill", "wastewater", "fuel", "hospital"];
   return (
     <div style={card}>
-      <SectionHeader iconName="factory" tint={color.clay} label="Pollution Sources" />
+      <SectionHeader
+        iconName="factory"
+        tint={color.clay}
+        label="Pollution Sources"
+        caption="OSM Overpass"
+        toggle={
+          closest && (
+            <ExpandToggleBtn expanded={expanded} onClick={() => setExpanded((s) => !s)} />
+          )
+        }
+      />
       {!closest ? (
         <div style={{ fontSize: 11, color: color.inkFaint }}>Will appear after measurement</div>
       ) : (
-        POLL_CATS.map((cat) =>
-          closest[cat] ? <SourceRow key={cat} source={closest[cat]} /> : <EmptyRow key={cat} cat={cat} />
-        )
+        POLL_CATS.map((cat) => (
+          <div key={cat}>
+            {closest[cat] ? <SourceRow source={closest[cat]} /> : <EmptyRow cat={cat} />}
+            {expanded && (
+              <ExpandedCategoryList cat={cat} sourceDists={sourceDists} />
+            )}
+          </div>
+        ))
       )}
     </div>
   );
@@ -155,21 +223,37 @@ function VegTile({ label, value, cls, range, min, max }) {
   );
 }
 
-export function GreenSummaryCard({ closest, ndvi, evi }) {
+export function GreenSummaryCard({ closest, ndvi, evi, sourceDists }) {
+  const [expanded, setExpanded] = useState(false);
   const GREEN_CATS = ["park", "forest"];
   const ndviClass = getNDVIClass(ndvi);
   const eviClass = getNDVIClass(evi);
 
   return (
     <div style={card}>
-      <SectionHeader iconName="tree" tint={color.forestSoft} label="Green Buffer & Vegetation" />
+      <SectionHeader
+        iconName="tree"
+        tint={color.forestSoft}
+        label="Green Buffer & Vegetation"
+        caption="OSM + MODIS ~1km"
+        toggle={
+          closest && (
+            <ExpandToggleBtn expanded={expanded} onClick={() => setExpanded((s) => !s)} />
+          )
+        }
+      />
 
       {!closest ? (
         <div style={{ fontSize: 11, color: color.inkFaint }}>Will appear after measurement</div>
       ) : (
-        GREEN_CATS.map((cat) =>
-          closest[cat] ? <SourceRow key={cat} source={closest[cat]} /> : <EmptyRow key={cat} cat={cat} />
-        )
+        GREEN_CATS.map((cat) => (
+          <div key={cat}>
+            {closest[cat] ? <SourceRow source={closest[cat]} /> : <EmptyRow cat={cat} />}
+            {expanded && (
+              <ExpandedCategoryList cat={cat} sourceDists={sourceDists} />
+            )}
+          </div>
+        ))
       )}
 
       <div style={{ margin: "12px 0 0" }}>

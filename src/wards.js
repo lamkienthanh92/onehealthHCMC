@@ -28,6 +28,15 @@ function pointInPolygon(lng, lat, polygon) {
   return true;
 }
 
+// Test whether (lat,lng) falls inside a specific already-known ward object
+// (skips the bbox search across all 168 wards that findWard() does).
+export function pointInWardPolygon(lat, lng, ward) {
+  for (const polygon of ward.polygons) {
+    if (pointInPolygon(lng, lat, polygon)) return true;
+  }
+  return false;
+}
+
 // Find which ward (phường/xã) a coordinate falls in. Returns ward object or null.
 export function findWard(lat, lng) {
   for (const ward of WARDS) {
@@ -38,4 +47,18 @@ export function findWard(lat, lng) {
     }
   }
   return null;
+}
+
+// Return all wards whose bbox overlaps a padded box around (lat,lng).
+// Used to draw administrative context on the map (not just the single
+// containing ward). paddingDeg ~0.02 = roughly 2km at this latitude.
+export function getNearbyWards(lat, lng, paddingDeg = 0.02) {
+  const minLng = lng - paddingDeg,
+    maxLng = lng + paddingDeg;
+  const minLat = lat - paddingDeg,
+    maxLat = lat + paddingDeg;
+  return WARDS.filter((ward) => {
+    const [wMinLng, wMinLat, wMaxLng, wMaxLat] = ward.bbox;
+    return !(wMaxLng < minLng || wMinLng > maxLng || wMaxLat < minLat || wMinLat > maxLat);
+  });
 }

@@ -20,6 +20,7 @@ import { lookupOneHealthLayers } from "./oneHealthGrids.js";
 import { findWard } from "./wards.js";
 import { MapView } from "./MapView.jsx";
 import { OneHealthCard } from "./OneHealthCard.jsx";
+import { DataSourcesTable } from "./DataSourcesTable.jsx";
 import { color, font, card, inp, eyebrow, buttonPrimary, topographicSvgDataUri } from "./theme.js";
 import { Readout, IconChip, SectionHeader, StatusDot, Icon, CAT_ICON } from "./ui.jsx";
 
@@ -424,6 +425,7 @@ export default function App() {
               label="Coordinates"
               value={`${result.geo.lat.toFixed(5)}, ${result.geo.lng.toFixed(5)}`}
               meta={result.patientName ? `👤 ${result.patientName}` : null}
+              tooltip="User-entered coordinate, as pasted from Google Maps — exact, not gridded."
             />
             <Readout
               iconName="ruler"
@@ -433,6 +435,7 @@ export default function App() {
               unit="m"
               meta={result.closest.name}
               statusLabel={roadRk.label}
+              tooltip="Source: road geometry inherited from original project (unverified, structurally OSM-like — see Data Sources table below). Distance: exact Haversine point-to-segment, not gridded."
             />
             <Readout
               iconName="cloudRain"
@@ -442,6 +445,7 @@ export default function App() {
               unit="µg/m³"
               meta="NASA ACAG 2023"
               statusLabel={pm25Rk.label}
+              tooltip="Source: NASA ACAG V6GL03, 2023. Resolution: 0.05°×0.05° (~5km) — much coarser than a single address; treat as neighborhood-level, not point-level."
             />
             <Readout
               iconName="ward"
@@ -454,6 +458,7 @@ export default function App() {
               }
               unit="/ 100m cell"
               meta={result.ward ? result.ward.name : "Outside HCMC"}
+              tooltip="Source: WorldPop community catalog, 2024. Displayed at ~1.4km grid spacing (downsampled from 100m native) — see Data Sources table below for the full caveat."
             />
           </div>
 
@@ -468,12 +473,14 @@ export default function App() {
           >
             <PollutionSummaryCard
               closest={result.closestByCat}
+              sourceDists={result.sourceDists}
               loading={false}
             />
             <GreenSummaryCard
               closest={result.closestByCat}
               ndvi={result.ndvi}
               evi={result.evi}
+              sourceDists={result.sourceDists}
             />
           </div>
 
@@ -495,6 +502,9 @@ export default function App() {
             ward={result.ward}
             loading={envLoading}
           />
+
+          {/* Full data provenance / resolution disclosure */}
+          <DataSourcesTable />
 
           {/* Bottom table */}
           <div
