@@ -363,3 +363,38 @@ fuel, market, butcher, farm) và Tiện ích/Xanh (park, forest, school,
 clinic, hospital, veterinary, recreation, publicinfra). Test với chợ Bến
 Thành ra đúng logic: chợ/công viên/bệnh viện gần → điểm 78-98; trại chăn
 nuôi/thú y xa → điểm 0.
+
+## Vòng nâng cấp thứ 10 — Bỏ heatmap mờ nhòe, đổi sang choropleth ô lưới thật
+
+Bạn phản hồi đúng: xem ảnh chụp thì thấy heatmap **không hề hiện ra** —
+chỉ thấy các chấm marker nguồn OSM, không có lớp gradient nào cả. Nguyên
+nhân nhiều khả năng: `leaflet.heat` là plugin UMD cũ, dễ gặp lỗi
+interop âm thầm khi chạy trong môi trường bundler ESM hiện đại (không
+báo lỗi, chỉ đơn giản là không attach `L.heatLayer` vào global `L`).
+
+Thay vì cố sửa plugin cũ, đổi hẳn cách tiếp cận theo đúng góp ý của bạn
+("vùng nào biên giới ra sao thì trông thế nào") — dùng **choropleth**:
+tô màu từng ô lưới thật với đường viền rõ ràng, thay vì heatmap mờ nhòe
+kiểu kernel density (vốn không hợp với dữ liệu dạng lưới rời rạc).
+
+### Thay đổi cụ thể (`MapView.jsx`)
+- **Bỏ hẳn `leaflet.heat`** khỏi dependencies — không cần plugin ngoài
+  nữa, chỉ dùng `L.rectangle` gốc của Leaflet.
+- **Choropleth dân số**: tô màu trực tiếp từng ô lưới 100m thật (không
+  làm mờ/nội suy), 5 màu theo ngũ phân vị toàn thành phố (P20/P40/P60/P80)
+  — xanh dương nhạt (thấp) → đỏ đậm (cao). Test quanh Q1 ra 2.853 ô,
+  đủ nhẹ để canvas render mượt.
+- **Choropleth mật độ ô nhiễm**: gộp điểm OSM (industrial/landfill/
+  wastewater/fuel) vào lưới ~280m tự dựng, tô màu theo số lượng nguồn/ô
+  (1/2/3/4/5+). Test quanh Q1 ra 25 ô có nguồn, hầu hết đếm được 1,
+  có 1 ô đếm được 2 — đúng logic vì nguồn ô nhiễm phân bố thưa.
+- **Chú giải màu (legend)** hiện ngay cạnh nút chuyển đổi, không cần
+  đoán ý nghĩa màu sắc.
+- Dùng `preferCanvas: true` cho toàn bản đồ — không chỉ nhanh hơn cho
+  choropleth mà còn giúp cả marker/ranh giới phường render mượt hơn.
+- Bật `preferCanvas` khiến choropleth tự động vẽ dưới marker/ranh giới
+  (`bringToBack()`) để điểm đo và viền phường không bị che.
+
+**Đã kiểm chứng bằng cách chạy thật** logic tạo ô lưới (không chỉ đọc
+code): số ô, ngưỡng màu, phân bố count đều hợp lý và đã in ra số liệu cụ
+thể ở trên.

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "leaflet.heat";
 import { SOURCE_CATS, SOURCES } from "./sourceUtils.js";
 import { getNearbyWards } from "./wards.js";
 import { getGrids } from "./gridLoader.js";
@@ -19,106 +18,180 @@ L.Icon.Default.mergeOptions({
 const MAX_MARKERS_PER_CAT = 8;
 const POLLUTION_CATS = ["industrial", "landfill", "wastewater", "fuel"];
 
-// Build heat points from the population grid, but NEVER feed the raw
-// ~700k-cell grid straight into leaflet.heat — that many points is both
-// a serious performance problem and, worse, a normalization problem:
-// population follows a power-law-like distribution (a few very dense
-// cells, a long tail of low-density cells), so normalizing linearly by
-// the raw max makes ~90% of the city read as near-invisible. Fix both
-// by (1) spatially re-aggregating to a coarser heat-grid at render time,
-// and (2) using a percentile cap + sqrt transform so mid-density areas
-// are actually visible instead of everything but the single hottest
-// block reading as empty.
-function buildPopulationHeatPoints() {
+// How far around the searched point to draw the choropleth grid. Bigger
+// box = more context but more rectangles to render; 0.025° (~2.7km) at
+// 100m cells is ~54x54 ≈ 2,900 rectangles, which the canvas renderer
+// handles comfortably.
+const CHORO_BOX_DEG = 0.025;
+
+// ── Population choropleth: real 100m grid cells, real color-coded value,
+// real borders. Replaces the earlier leaflet.heat blur, which (a) wasn't
+// rendering reliably -- UMD plugin interop issues are common in bundled
+// ESM apps -- and (b) was the wrong visual metaphor anyway: this is
+// discrete gridded data, not a continuous density field, so showing it
+// as actual bounded cells is both more honest and easier to read.
+let _popThresholds = null;
+function getPopThresholds(grid) {
+  if (_popThresholds) return _popThresholds;
+  const vals = [];
+  for (const row of grid.grid) for (const v of row) if (v !== null && v > 0) vals.push(v);
+  vals.sort((a, b) => a - b);
+  const at = (p) => vals[Math.floor(vals.length * p)] || 0;
+  _popThresholds = [at(0.2), at(0.4), at(0.6), at(0.8)];
+  return _popThresholds;
+}
+
+const POP_COLORS = ["#DBEAFE", "#93C5FD", "#FBBF24", "#F97316", "#DC2626"];
+
+function popColorFor(v, thresholds) {
+  if (v === null || v === undefined || v <= 0) return null;
+  for (let i = 0; i < thresholds.length; i++) {
+    if (v <= thresholds[i]) return POP_COLORS[i];
+  }
+  return POP_COLORS[POP_COLORS.length - 1];
+}
+
+function buildPopulationChoropleth(lat, lng) {
   const grids = getGrids();
-  if (!grids) return [];
-  const { lats, lons, grid } = grids.population;
-  const AGG = 6; // re-aggregate ~6x6 native cells per heat point (~600m blocks)
-  const agg = [];
-  for (let i = 0; i < lats.length; i += AGG) {
-    for (let j = 0; j < lons.length; j += AGG) {
-      let sum = 0,
-        n = 0;
-      for (let di = 0; di < AGG && i + di < lats.length; di++) {
-        for (let dj = 0; dj < AGG && j + dj < lons.length; dj++) {
-          const v = grid[i + di][j + dj];
-          if (v !== null && v !== undefined) {
-            sum += v;
-            n++;
-          }
-        }
-      }
-      if (n > 0 && sum > 0) {
-        agg.push({
-          lat: lats[Math.min(i + Math.floor(AGG / 2), lats.length - 1)],
-          lng: lons[Math.min(j + Math.floor(AGG / 2), lons.length - 1)],
-          v: sum / n,
-        });
-      }
+  if (!grids) return { rects: [], legend: [] };
+  const g = grids.population;
+  const { lats, lons, grid } = g;
+  const halfLat = (lats[1] - lats[0]) / 2;
+  const halfLng = (lons[1] - lons[0]) / 2;
+  const thresholds = getPopThresholds(g);
+
+  let iLo = lats.findIndex((v) => v >= lat - CHORO_BOX_DEG);
+  if (iLo < 0) iLo = 0;
+  let iHi = lats.length - 1;
+  while (iHi > 0 && lats[iHi] > lat + CHORO_BOX_DEG) iHi--;
+  let jLo = lons.findIndex((v) => v >= lng - CHORO_BOX_DEG);
+  if (jLo < 0) jLo = 0;
+  let jHi = lons.length - 1;
+  while (jHi > 0 && lons[jHi] > lng + CHORO_BOX_DEG) jHi--;
+
+  const rects = [];
+  for (let i = iLo; i <= iHi; i++) {
+    for (let j = jLo; j <= jHi; j++) {
+      const v = grid[i][j];
+      const c = popColorFor(v, thresholds);
+      if (!c) continue;
+      rects.push({
+        bounds: [
+          [lats[i] - halfLat, lons[j] - halfLng],
+          [lats[i] + halfLat, lons[j] + halfLng],
+        ],
+        color: c,
+        popup: `<b>${v.toFixed(1)} people</b> / 100m cell`,
+      });
     }
   }
-
-  // Percentile cap (p95) instead of raw max — a handful of extreme cells
-  // (e.g. one dense apartment block) shouldn't compress the entire rest
-  // of the city into invisibility.
-  const sorted = agg.map((p) => p.v).sort((a, b) => a - b);
-  const p95 = sorted[Math.floor(sorted.length * 0.95)] || sorted[sorted.length - 1] || 1;
-
-  return agg.map((p) => [
-    p.lat,
-    p.lng,
-    Math.min(1, Math.sqrt(p.v / p95)), // sqrt compresses the top end, lifts the middle
-  ]);
+  return {
+    rects,
+    legend: [
+      { color: POP_COLORS[0], label: `≤ ${thresholds[0].toFixed(0)}` },
+      { color: POP_COLORS[1], label: `≤ ${thresholds[1].toFixed(0)}` },
+      { color: POP_COLORS[2], label: `≤ ${thresholds[2].toFixed(0)}` },
+      { color: POP_COLORS[3], label: `≤ ${thresholds[3].toFixed(0)}` },
+      { color: POP_COLORS[4], label: `> ${thresholds[3].toFixed(0)}` },
+    ],
+  };
 }
 
-function buildPollutionHeatPoints() {
-  return SOURCES.filter((s) => POLLUTION_CATS.includes(s.cat)).map((s) => [
-    s.lat,
-    s.lng,
-    0.6,
-  ]);
+// ── Pollution-source-density choropleth: bins OSM pollution-category
+// points into a coarser grid (built on the fly, ~250m cells) and colors
+// by count per cell. Also real bounded cells, not a blur.
+const POLL_COLORS = ["#FEF3C7", "#FDBA74", "#F97316", "#DC2626", "#7C2D12"];
+const POLL_CELL_DEG = 0.0025; // ~250-280m
+
+function buildPollutionChoropleth(lat, lng) {
+  const cellsMap = new Map();
+  const iOf = (v) => Math.floor(v / POLL_CELL_DEG);
+
+  for (const s of SOURCES) {
+    if (!POLLUTION_CATS.includes(s.cat)) continue;
+    if (Math.abs(s.lat - lat) > CHORO_BOX_DEG || Math.abs(s.lng - lng) > CHORO_BOX_DEG) continue;
+    const key = `${iOf(s.lat)}|${iOf(s.lng)}`;
+    cellsMap.set(key, (cellsMap.get(key) || 0) + 1);
+  }
+
+  const rects = [];
+  for (const [key, count] of cellsMap.entries()) {
+    const [ci, cj] = key.split("|").map(Number);
+    const cLat = ci * POLL_CELL_DEG;
+    const cLng = cj * POLL_CELL_DEG;
+    const colorIdx = Math.min(POLL_COLORS.length - 1, count - 1);
+    rects.push({
+      bounds: [
+        [cLat, cLng],
+        [cLat + POLL_CELL_DEG, cLng + POLL_CELL_DEG],
+      ],
+      color: POLL_COLORS[colorIdx],
+      popup: `<b>${count}</b> pollution source${count !== 1 ? "s" : ""} in this ~280m cell`,
+    });
+  }
+  return {
+    rects,
+    legend: [
+      { color: POLL_COLORS[0], label: "1" },
+      { color: POLL_COLORS[1], label: "2" },
+      { color: POLL_COLORS[2], label: "3" },
+      { color: POLL_COLORS[3], label: "4" },
+      { color: POLL_COLORS[4], label: "5+" },
+    ],
+  };
 }
 
-function HeatToggle({ mode, setMode }) {
+function ChoroplethToggle({ mode, setMode, legend }) {
   const options = [
     ["none", "None"],
     ["population", "Population"],
     ["pollution", "Pollution"],
   ];
   return (
-    <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
-      <span
-        style={{
-          fontSize: 9.5,
-          fontFamily: font.mono,
-          color: color.inkFaint,
-          alignSelf: "center",
-          marginRight: 2,
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-        }}
-      >
-        Heatmap:
-      </span>
-      {options.map(([k, label]) => (
-        <button
-          key={k}
-          onClick={() => setMode(k)}
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+        <span
           style={{
-            fontSize: 10,
+            fontSize: 9.5,
             fontFamily: font.mono,
-            fontWeight: 700,
-            padding: "4px 10px",
-            borderRadius: 6,
-            border: "none",
-            cursor: "pointer",
-            background: mode === k ? color.forest : color.sageMist,
-            color: mode === k ? "#fff" : color.inkSoft,
+            color: color.inkFaint,
+            marginRight: 2,
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
           }}
         >
-          {label}
-        </button>
-      ))}
+          Grid overlay:
+        </span>
+        {options.map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setMode(k)}
+            style={{
+              fontSize: 10,
+              fontFamily: font.mono,
+              fontWeight: 700,
+              padding: "4px 10px",
+              borderRadius: 6,
+              border: "none",
+              cursor: "pointer",
+              background: mode === k ? color.forest : color.sageMist,
+              color: mode === k ? "#fff" : color.inkSoft,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+        {legend && legend.length > 0 && (
+          <div style={{ display: "flex", gap: 6, marginLeft: 8, alignItems: "center" }}>
+            {legend.map((l, i) => (
+              <span key={i} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <span style={{ width: 10, height: 10, background: l.color, borderRadius: 2, border: `1px solid ${color.line}` }} />
+                <span style={{ fontSize: 8.5, fontFamily: font.mono, color: color.inkFaint }}>{l.label}</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -127,8 +200,9 @@ export function MapView({ point, sourceDists, ward, closestRoad }) {
   const mapRef = useRef(null);
   const containerRef = useRef(null);
   const layerRef = useRef(null);
-  const heatLayerRef = useRef(null);
-  const [heatMode, setHeatMode] = useState("none");
+  const choroLayerRef = useRef(null);
+  const [choroMode, setChoroMode] = useState("population");
+  const [legend, setLegend] = useState([]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -136,6 +210,9 @@ export function MapView({ point, sourceDists, ward, closestRoad }) {
       mapRef.current = L.map(containerRef.current, {
         zoomControl: true,
         attributionControl: true,
+        preferCanvas: true, // rectangles/circles render via canvas -- much
+                             // faster than SVG once we're drawing thousands
+                             // of choropleth cells.
       });
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
@@ -159,13 +236,10 @@ export function MapView({ point, sourceDists, ward, closestRoad }) {
     const group = L.layerGroup().addTo(map);
     layerRef.current = group;
 
-    // Main point marker
     L.marker([point.lat, point.lng])
       .addTo(group)
       .bindPopup("<b>📍 Measured location</b>");
 
-    // Multiple ward boundaries in the surrounding area — the containing
-    // ward is drawn bold, neighboring wards are drawn as thin context.
     const nearbyWards = getNearbyWards(point.lat, point.lng, 0.02);
     nearbyWards.forEach((w) => {
       const isContaining = ward && w.name === ward.name;
@@ -177,7 +251,7 @@ export function MapView({ point, sourceDists, ward, closestRoad }) {
           color: isContaining ? color.forestSoft : color.inkFaint,
           weight: isContaining ? 2.5 : 1,
           fillColor: isContaining ? color.sage : "transparent",
-          fillOpacity: isContaining ? 0.08 : 0,
+          fillOpacity: isContaining ? 0.04 : 0,
           opacity: isContaining ? 1 : 0.5,
           dashArray: isContaining ? null : "3,4",
         })
@@ -186,7 +260,6 @@ export function MapView({ point, sourceDists, ward, closestRoad }) {
       });
     });
 
-    // Nearest sources by category (capped)
     const byCat = {};
     for (const s of sourceDists || []) {
       if (!byCat[s.cat]) byCat[s.cat] = [];
@@ -214,37 +287,46 @@ export function MapView({ point, sourceDists, ward, closestRoad }) {
     map.setView([point.lat, point.lng], 15);
   }, [point, sourceDists, ward]);
 
-  // Heatmap layer (independent toggle, doesn't require re-searching)
+  // Choropleth grid layer (independent toggle)
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    if (heatLayerRef.current) {
-      heatLayerRef.current.remove();
-      heatLayerRef.current = null;
+    if (!map || !point) return;
+    if (choroLayerRef.current) {
+      choroLayerRef.current.remove();
+      choroLayerRef.current = null;
     }
-    if (heatMode === "none") return;
+    if (choroMode === "none") {
+      setLegend([]);
+      return;
+    }
 
-    const pts =
-      heatMode === "population"
-        ? buildPopulationHeatPoints()
-        : buildPollutionHeatPoints();
+    const { rects, legend: lg } =
+      choroMode === "population"
+        ? buildPopulationChoropleth(point.lat, point.lng)
+        : buildPollutionChoropleth(point.lat, point.lng);
 
-    heatLayerRef.current = L.heatLayer(pts, {
-      radius: heatMode === "population" ? 20 : 22,
-      blur: 18,
-      max: 1.0,
-      maxZoom: 17,
-      minOpacity: 0.35,
-      gradient:
-        heatMode === "population"
-          ? { 0.0: "#2563EB", 0.3: "#22C55E", 0.55: "#EAB308", 0.75: "#F97316", 1: "#DC2626" }
-          : { 0.0: "#FDE68A", 0.35: "#F59E0B", 0.6: "#DC2626", 0.85: "#7C2D12", 1: "#450A0A" },
-    }).addTo(map);
-  }, [heatMode]);
+    const group = L.layerGroup();
+    rects.forEach((r) => {
+      L.rectangle(r.bounds, {
+        color: "rgba(255,255,255,0.4)",
+        weight: 0.5,
+        fillColor: r.color,
+        fillOpacity: 0.55,
+      })
+        .addTo(group)
+        .bindPopup(r.popup);
+    });
+    group.addTo(map);
+    // Draw choropleth BELOW markers/boundaries -- bring the marker layer
+    // back to front so the point pin and ward outline stay legible.
+    group.bringToBack();
+    choroLayerRef.current = group;
+    setLegend(lg);
+  }, [choroMode, point]);
 
   return (
     <div>
-      <HeatToggle mode={heatMode} setMode={setHeatMode} />
+      <ChoroplethToggle mode={choroMode} setMode={setChoroMode} legend={legend} />
       <div
         ref={containerRef}
         style={{
@@ -257,8 +339,9 @@ export function MapView({ point, sourceDists, ward, closestRoad }) {
       />
       <p style={{ fontSize: 9, color: color.inkFaint, marginTop: 6, lineHeight: 1.5 }}>
         Solid boundary = ward containing this point · dashed = neighboring
-        wards (context only). Population heatmap uses the downsampled
-        ~1.5km grid — expect blocky, not street-level, detail.
+        wards (context only). Grid overlay shows real cell boundaries at
+        their actual resolution (population: 100m · pollution density:
+        ~280m) — colored by value, not a blurred estimate.
       </p>
     </div>
   );
