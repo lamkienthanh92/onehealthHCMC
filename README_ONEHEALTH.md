@@ -398,3 +398,26 @@ kiểu kernel density (vốn không hợp với dữ liệu dạng lưới rời
 **Đã kiểm chứng bằng cách chạy thật** logic tạo ô lưới (không chỉ đọc
 code): số ô, ngưỡng màu, phân bố count đều hợp lý và đã in ra số liệu cụ
 thể ở trên.
+
+## Vòng nâng cấp thứ 11 — Sửa 2 lỗi thật từ log deploy production
+
+Bạn gửi log console từ bản deploy thật (onehealthhcmc.netlify.app), phát
+hiện 2 lỗi:
+
+### 1. `manifest.json` 404 (và khả năng `favicon.ico` cũng vậy)
+`public/index.html` tham chiếu tới 2 file này nhưng chưa từng được tạo
+trong toàn bộ quá trình làm việc trước đó. Đã bổ sung cả 2 (`manifest.json`
+tối giản hợp lệ, `favicon.ico` màu forest-green đơn giản khớp theme).
+
+### 2. `TypeError: r.bringToBack is not a function` — lỗi code thật của mình
+`L.layerGroup()` **không có** hàm `bringToBack()` — hàm này chỉ tồn tại
+trên từng vector layer riêng lẻ (Polygon/Rectangle/Circle), không phải
+trên LayerGroup. Mình gọi nhầm ở vòng nâng cấp choropleth trước, khiến
+toàn bộ bản đồ crash ngay khi bật chế độ Population/Pollution.
+
+**Sửa đúng cách** (không phải vá tạm): dùng Leaflet pane để kiểm soát
+thứ tự vẽ. Tạo 1 pane riêng tên `choropleth` với `z-index: 350` (thấp
+hơn pane mặc định 400 nơi marker/ranh giới phường nằm), gán `pane:
+"choropleth"` cho từng ô rectangle khi tạo. Cách này đáng tin cậy hơn
+`bringToBack()` vì không phụ thuộc thứ tự effect nào chạy trước — kiểm
+soát z-index ở tầng CSS/pane, không phải thứ tự thêm layer.

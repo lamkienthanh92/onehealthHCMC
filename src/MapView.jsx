@@ -218,6 +218,14 @@ export function MapView({ point, sourceDists, ward, closestRoad }) {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors",
       }).addTo(mapRef.current);
+
+      // Dedicated pane below the default overlay pane (z-index 400) so
+      // choropleth cells always render underneath markers/ward outlines
+      // regardless of which effect adds its layer first. (LayerGroup has
+      // no bringToBack() — that only exists on individual vector layers
+      // — so pane-based ordering is the robust fix, not a per-layer call.)
+      const pane = mapRef.current.createPane("choropleth");
+      pane.style.zIndex = 350;
     }
     return () => {
       if (mapRef.current) {
@@ -308,6 +316,7 @@ export function MapView({ point, sourceDists, ward, closestRoad }) {
     const group = L.layerGroup();
     rects.forEach((r) => {
       L.rectangle(r.bounds, {
+        pane: "choropleth",
         color: "rgba(255,255,255,0.4)",
         weight: 0.5,
         fillColor: r.color,
@@ -317,9 +326,6 @@ export function MapView({ point, sourceDists, ward, closestRoad }) {
         .bindPopup(r.popup);
     });
     group.addTo(map);
-    // Draw choropleth BELOW markers/boundaries -- bring the marker layer
-    // back to front so the point pin and ward outline stay legible.
-    group.bringToBack();
     choroLayerRef.current = group;
     setLegend(lg);
   }, [choroMode, point]);
