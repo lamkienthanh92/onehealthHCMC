@@ -1,14 +1,21 @@
-import { POPULATION_GRID } from "./oneHealthGrids.js";
+import { getGrids } from "./gridLoader.js";
 import { pointInWardPolygon } from "./wards.js";
+
+function popGrid() {
+  const g = getGrids();
+  return g ? g.population : null;
+}
 
 // City-wide average population per 100m grid cell, computed once from the
 // full grid (lazy singleton — expensive-ish but only runs once ever).
 let _cityAvg = null;
 export function getCityAveragePopulation() {
   if (_cityAvg !== null) return _cityAvg;
+  const g = popGrid();
+  if (!g) return null;
   let sum = 0,
     n = 0;
-  for (const row of POPULATION_GRID.grid) {
+  for (const row of g.grid) {
     for (const v of row) {
       if (v !== null && v !== undefined) {
         sum += v;
@@ -29,8 +36,9 @@ const _wardAvgCache = new Map();
 export function getWardAveragePopulation(ward) {
   if (!ward) return { avg: null, cellCount: 0 };
   if (_wardAvgCache.has(ward.name)) return _wardAvgCache.get(ward.name);
-
-  const { lats, lons, grid } = POPULATION_GRID;
+  const g = popGrid();
+  if (!g) return { avg: null, cellCount: 0 };
+  const { lats, lons, grid } = g;
   let sum = 0,
     n = 0;
   for (let i = 0; i < lats.length; i++) {
@@ -71,7 +79,9 @@ export function buildPopulationComparison(currentValue, ward) {
 const RADII_M = [200, 500, 1000, 2000, 3000];
 
 export function getPopulationDistanceProfile(lat, lng) {
-  const { lats, lons, grid } = POPULATION_GRID;
+  const g = popGrid();
+  if (!g) return [];
+  const { lats, lons, grid } = g;
   const maxRadiusM = RADII_M[RADII_M.length - 1];
   const dLat = maxRadiusM / 111000;
   const dLng = maxRadiusM / (111000 * Math.cos((lat * Math.PI) / 180));
@@ -119,8 +129,10 @@ let _sortedCityValues = null;
 export function getPopulationPercentile(value) {
   if (value === null || value === undefined) return null;
   if (_sortedCityValues === null) {
+    const g = popGrid();
+    if (!g) return null;
     const vals = [];
-    for (const row of POPULATION_GRID.grid) {
+    for (const row of g.grid) {
       for (const v of row) {
         if (v !== null && v !== undefined) vals.push(v);
       }

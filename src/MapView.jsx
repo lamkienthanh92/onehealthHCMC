@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 import { SOURCE_CATS, SOURCES } from "./sourceUtils.js";
 import { getNearbyWards } from "./wards.js";
-import { POPULATION_GRID } from "./oneHealthGrids.js";
+import { getGrids } from "./gridLoader.js";
 import { color, font } from "./theme.js";
 
 // Fix default marker icons (Leaflet + bundlers issue)
@@ -30,7 +30,9 @@ const POLLUTION_CATS = ["industrial", "landfill", "wastewater", "fuel"];
 // are actually visible instead of everything but the single hottest
 // block reading as empty.
 function buildPopulationHeatPoints() {
-  const { lats, lons, grid } = POPULATION_GRID;
+  const grids = getGrids();
+  if (!grids) return [];
+  const { lats, lons, grid } = grids.population;
   const AGG = 6; // re-aggregate ~6x6 native cells per heat point (~600m blocks)
   const agg = [];
   for (let i = 0; i < lats.length; i += AGG) {

@@ -287,3 +287,39 @@ Test thử với 2 điểm để kiểm chứng logic hợp lý: Q1 (đông dân
 mật độ tương đối phẳng theo bán kính vì cả khu vực đều đông) vs Củ Chi
 (đông dân hơn 38% TP, mật độ tăng dần theo bán kính — hợp lý vì điểm đo
 nằm ở vùng thưa nhưng gần trung tâm xã hơn khi mở rộng bán kính).
+
+## Vòng nâng cấp thứ 8 — Sửa lỗi crash khi deploy (JavaScript heap out of memory)
+
+Deploy lên Netlify báo lỗi `FATAL ERROR: Ineffective mark-compacts near
+heap limit Allocation failed - JavaScript heap out of memory` khi chạy
+`npm run build`. Nguyên nhân: `oneHealthGrids.js` nặng 14.6MB dạng JS
+literal — khi build production, bundler (webpack/babel) phải dựng cây cú
+pháp (AST) cho toàn bộ literal đó trong bộ nhớ, chi phí gấp 10-20 lần kích
+thước file gốc, vượt quá giới hạn heap mặc định (~2GB) của môi trường
+build Netlify.
+
+### Sửa đúng gốc rễ (không phải band-aid)
+Chuyển toàn bộ dữ liệu lưới (19MB) ra khỏi bundle JS, thành file JSON tĩnh
+`public/data/grids.json` — CRA copy nguyên vẹn file này vào build output,
+**không hề đưa qua bundler/babel để biên dịch**. Trình duyệt tự `fetch()`
++ `JSON.parse()` lúc chạy, nhẹ hơn nhiều so với việc bundler phải "hiểu"
+code JS.
+
+### Các thay đổi cụ thể:
+- **`gridLoader.js`** (mới) — quản lý việc `fetch()` 1 lần, cache lại cho
+  cả session. Các hàm `loadGrids()`, `getGrids()`, `isGridsLoaded()`.
+- **`oneHealthGrids.js`** — từ 14.6MB xuống còn **5.3KB**, giờ chỉ chứa
+  `GRID_META` (nhỏ) và hàm tra cứu đọc dữ liệu qua `getGrids()`.
+- **`populationStats.js`, `MapView.jsx`** — đổi từ import tĩnh sang gọi
+  `getGrids()` lúc runtime.
+- **`App.jsx`** — thêm loading gate: tải grids 1 lần lúc mở app, hiện
+  banner "⏳ Loading ~19MB..." và khóa nút Measure cho đến khi tải xong.
+- **`netlify.toml`** (mới) — tăng heap build lên 4GB làm lớp an toàn bổ
+  sung (dù không còn thật sự cần thiết sau khi sửa gốc rễ).
+
+**Đã kiểm chứng bằng cách chạy thật** (mô phỏng `fetch` qua Node, đọc
+thẳng file JSON): tải 19MB trong 487ms, tra cứu ra đúng số liệu như
+trước, Excel export vẫn hoạt động, header/row vẫn khớp 964 cột.
+
+**Tổng bundle JS giờ chỉ còn ~3.1MB** (chủ yếu do `roads.js`/`sources.js`
+gốc, không phải phần One Health mới) — không còn nguy cơ OOM khi build.

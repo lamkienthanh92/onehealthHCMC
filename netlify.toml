@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+[build.environment]
+  # Safety margin even though the grids.json fix should make this
+  # unnecessary — a large JSON asset in /public still gets copied and
+  # briefly held in memory during the build's file-copy step.
+  NODE_OPTIONS = "--max-old-space-size=4096"

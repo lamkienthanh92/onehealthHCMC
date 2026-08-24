@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { ROADS, ROAD_NAMES } from "./roads.js";
 import { ROAD_PM25, lookupPM25, getPM25Risk } from "./air.js";
 import {
@@ -17,6 +17,7 @@ import {
 import { SourcesTable } from "./sourcesTable";
 import { exportExcel } from "./excelExport.js";
 import { lookupOneHealthLayers } from "./oneHealthGrids.js";
+import { loadGrids } from "./gridLoader.js";
 import { findWard } from "./wards.js";
 import { MapView } from "./MapView.jsx";
 import { OneHealthCard } from "./OneHealthCard.jsx";
@@ -85,6 +86,27 @@ export default function App() {
   const [filterCat, setFilterCat] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [envLoading, setEnvLoading] = useState(false);
+  const [gridsReady, setGridsReady] = useState(false);
+  const [gridsError, setGridsError] = useState(null);
+  const [gridsProgress, setGridsProgress] = useState(0);
+
+  // Load the ~19MB One Health environmental grids ONCE on mount, from a
+  // static JSON asset (not bundled JS -- see gridLoader.js for why).
+  // Everything that reads grid data (search, map heatmap, population
+  // chart) is gated on gridsReady so nothing reads a null grid.
+  useEffect(() => {
+    let cancelled = false;
+    loadGrids()
+      .then(() => {
+        if (!cancelled) setGridsReady(true);
+      })
+      .catch((e) => {
+        if (!cancelled) setGridsError(e.message || String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const doSearch = useCallback(async () => {
     const p = parseCoord(coord);
@@ -326,18 +348,50 @@ export default function App() {
           </div>
           <button
             onClick={doSearch}
-            disabled={!ok || envLoading}
+            disabled={!ok || envLoading || !gridsReady}
             style={{
               ...buttonPrimary,
               flexShrink: 0,
               whiteSpace: "nowrap",
-              background: ok && !envLoading ? color.forest : "#D1D5DB",
-              cursor: ok && !envLoading ? "pointer" : "not-allowed",
+              background: ok && !envLoading && gridsReady ? color.forest : "#D1D5DB",
+              cursor: ok && !envLoading && gridsReady ? "pointer" : "not-allowed",
             }}
           >
-            {envLoading ? "Loading…" : "Measure"}
+            {!gridsReady ? "Loading data…" : envLoading ? "Loading…" : "Measure"}
           </button>
         </div>
+        {!gridsReady && !gridsError && (
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 11,
+              color: color.inkSoft,
+              background: color.sageMist,
+              borderRadius: 7,
+              padding: "7px 12px",
+            }}
+          >
+            ⏳ Loading ~19MB of environmental grid data (population, air
+            quality, land cover…) — one-time load, cached for the rest of
+            this session. May take a few seconds on a slower connection.
+          </div>
+        )}
+        {gridsError && (
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 11,
+              color: color.brick,
+              background: color.brickMist,
+              borderRadius: 7,
+              padding: "7px 12px",
+            }}
+          >
+            ⚠️ Failed to load environmental data: {gridsError}. Check that{" "}
+            <code>/public/data/grids.json</code> was deployed alongside the
+            app, then reload the page.
+          </div>
+        )}
         {err && (
           <div
             style={{
