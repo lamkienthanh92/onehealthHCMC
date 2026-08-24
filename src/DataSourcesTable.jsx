@@ -60,7 +60,7 @@ const OTHER_ROWS = [
 
 const CONF_COLOR = { high: color.forestSoft, medium: color.amber, low: color.brick };
 
-function ResRow({ layer, source, resolution, vintage, confidence }) {
+function ResRow({ layer, source, resolution, vintage, confidence, note }) {
   return (
     <tr style={{ borderBottom: `1px solid ${color.line}` }}>
       <td style={{ padding: "8px 10px", fontSize: 11, fontWeight: 600, color: color.ink, verticalAlign: "top" }}>
@@ -91,6 +91,9 @@ function ResRow({ layer, source, resolution, vintage, confidence }) {
           {confidence}
         </span>
       </td>
+      <td style={{ padding: "8px 10px", fontSize: 9.5, color: color.inkFaint, verticalAlign: "top", maxWidth: 220 }}>
+        {note || ""}
+      </td>
     </tr>
   );
 }
@@ -100,9 +103,10 @@ export function DataSourcesTable() {
   const gridRows = Object.entries(GRID_META).map(([key, m]) => ({
     layer: m.label.split("(")[0].trim(),
     source: m.source,
-    resolution: `native ${m.nativeRes} → displayed ${m.displayRes} (downsampled)`,
+    resolution: m.nativeRes === m.displayRes ? m.nativeRes : `${m.nativeRes} → ${m.displayRes}`,
     vintage: m.vintage,
     confidence: "high",
+    note: m.note,
   }));
 
   return (
@@ -142,7 +146,7 @@ export function DataSourcesTable() {
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
             <thead>
               <tr style={{ borderBottom: `2px solid ${color.line}` }}>
-                {["Layer", "Source", "Resolution", "Vintage", "Confidence"].map((h) => (
+                {["Layer", "Source", "Resolution", "Vintage", "Confidence", "Note"].map((h) => (
                   <th
                     key={h}
                     style={{

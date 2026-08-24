@@ -23,10 +23,8 @@ export function getCityAveragePopulation() {
 // Average population per 100m grid cell across every grid-cell centroid
 // that falls inside the given ward's polygon. Cached per ward name since
 // the same ward is likely to be re-queried within a session.
-// Returns { avg, cellCount } — cellCount matters because the population
-// grid was downsampled to ~1.5km spacing, so small wards often contain
-// only 1 grid point. Callers should disclose cellCount so the "average"
-// isn't mistaken for a real multi-sample statistic.
+// Returns { avg, cellCount } for transparency about sample size (now
+// typically dozens-hundreds of cells per ward at 100m resolution, not 1).
 const _wardAvgCache = new Map();
 export function getWardAveragePopulation(ward) {
   if (!ward) return { avg: null, cellCount: 0 };
@@ -62,4 +60,81 @@ export function buildPopulationComparison(currentValue, ward) {
     ],
     wardCellCount: cellCount,
   };
+}
+
+// Population density profile as a function of distance from a point —
+// shows the actual spatial trend (dense core vs. tapering outward) that
+// a single 3-bar comparison can't convey. Efficient: only scans the
+// small bounding-box submatrix around the point (a few thousand cells
+// at 100m resolution), not the full ~700k-cell grid, even though it
+// computes 5 radius bins in one pass.
+const RADII_M = [200, 500, 1000, 2000, 3000];
+
+export function getPopulationDistanceProfile(lat, lng) {
+  const { lats, lons, grid } = POPULATION_GRID;
+  const maxRadiusM = RADII_M[RADII_M.length - 1];
+  const dLat = maxRadiusM / 111000;
+  const dLng = maxRadiusM / (111000 * Math.cos((lat * Math.PI) / 180));
+
+  let iLo = lats.findIndex((v) => v >= lat - dLat);
+  if (iLo < 0) iLo = 0;
+  let iHi = lats.length - 1;
+  while (iHi > 0 && lats[iHi] > lat + dLat) iHi--;
+  let jLo = lons.findIndex((v) => v >= lng - dLng);
+  if (jLo < 0) jLo = 0;
+  let jHi = lons.length - 1;
+  while (jHi > 0 && lons[jHi] > lng + dLng) jHi--;
+
+  const sums = RADII_M.map(() => 0);
+  const counts = RADII_M.map(() => 0);
+
+  for (let i = iLo; i <= iHi; i++) {
+    for (let j = jLo; j <= jHi; j++) {
+      const v = grid[i][j];
+      if (v === null || v === undefined) continue;
+      const dy = (lats[i] - lat) * 111000;
+      const dx = (lons[j] - lng) * 111000 * Math.cos((lat * Math.PI) / 180);
+      const distM = Math.sqrt(dx * dx + dy * dy);
+      for (let r = 0; r < RADII_M.length; r++) {
+        if (distM <= RADII_M[r]) {
+          sums[r] += v;
+          counts[r]++;
+        }
+      }
+    }
+  }
+
+  return RADII_M.map((r, i) => ({
+    radius: r,
+    label: r >= 1000 ? `${r / 1000}km` : `${r}m`,
+    avgDensity: counts[i] ? sums[i] / counts[i] : null,
+    cellCount: counts[i],
+  }));
+}
+
+// This location's percentile rank within the full city population-density
+// distribution — "denser than 82% of HCMC" is far more legible than a raw
+// "people per cell" number with no context.
+let _sortedCityValues = null;
+export function getPopulationPercentile(value) {
+  if (value === null || value === undefined) return null;
+  if (_sortedCityValues === null) {
+    const vals = [];
+    for (const row of POPULATION_GRID.grid) {
+      for (const v of row) {
+        if (v !== null && v !== undefined) vals.push(v);
+      }
+    }
+    vals.sort((a, b) => a - b);
+    _sortedCityValues = vals;
+  }
+  const arr = _sortedCityValues;
+  let lo = 0,
+    hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid] < value) lo = mid + 1;
+    else hi = mid;
+  }
+  return Math.round((lo / arr.length) * 100);
 }

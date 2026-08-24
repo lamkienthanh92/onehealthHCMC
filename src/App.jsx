@@ -501,6 +501,7 @@ export default function App() {
             oneHealth={result.oneHealth}
             ward={result.ward}
             loading={envLoading}
+            point={result.geo}
           />
 
           {/* Full data provenance / resolution disclosure */}

@@ -224,3 +224,66 @@ gốc thực ra đã là độ C sẵn (25–36°C, hợp lý cho HCMC). Đã s�
 hiện dấu hiệu bug này ảnh hưởng đến quyết định trước đó vì giá trị vẫn
 "trông hợp lý" một cách tình cờ — nhắc để bạn biết luôn kiểm tra range giá
 trị thực tế, không chỉ tin vào code "chạy không lỗi".
+
+## Vòng nâng cấp thứ 6 — Đẩy sát native resolution nhất có thể
+
+Bạn hỏi tiếp: "300m hay 1km vẫn dài, cần sát hơn nữa" — đúng, đã đẩy tiếp:
+
+| Nhóm | Vòng trước | Bây giờ | Ghi chú |
+|---|---|---|---|
+| NO2/SO2/CO/O3/LST | ~1km | **~1km — không đổi** | Giới hạn vật lý cảm biến Sentinel-5P/MODIS, không thể mịn hơn từ nguồn này |
+| Night Lights | ~500m | **~500m — không đổi** | Giới hạn vật lý cảm biến VIIRS |
+| Built-up/Water/Population | ~300m | **100m — FULL NATIVE, không nén nữa** | |
+| Elevation/Tree Cover/Forest Loss | ~390m | **~150m** | Native 30m nhưng full-native sẽ ~130MB/lớp — không khả thi |
+| Land Cover | ~350m | **100m** | Native 10m nhưng full-native sẽ >100MB — không khả thi |
+
+Bundle tăng từ 2.6MB → **~14.6MB** (`oneHealthGrids.js`).
+
+**Kết quả đo được (không chỉ nói suông):** cỡ mẫu tính "trung bình phường"
+ở phường Bến Thành tăng từ **1 ô → 18 ô (vòng trước) → 170 ô (vòng này)**.
+Đây mới thực sự là một con số trung bình thống kê đáng tin.
+
+**Giới hạn thật sự còn lại** (không thể cải thiện thêm từ nguồn dữ liệu
+hiện có, đã giải thích rõ trong `GRID_META[key].note` và tooltip UI):
+- 6 lớp khí/nhiệt/ánh sáng đêm bị giới hạn bởi chính độ phân giải cảm biến
+  vệ tinh — đây không phải lựa chọn kỹ thuật của mình, mà là vật lý.
+- 4 lớp còn lại (elevation, tree cover, forest loss, land cover) dùng
+  ~100-150m thay vì native 10-30m vì full-native sẽ tạo file 100+MB/lớp,
+  trình duyệt không tải/parse nổi ở mức hợp lý.
+
+**Lưu ý hiệu năng:** với bundle ~19MB (đã cộng roads.js/sources.js/wards.js
+sẵn có), `npm start` lần đầu và load trang sẽ chậm hơn đáng kể so với các
+vòng trước (vài giây thay vì gần như tức thời). Đây là đánh đổi trực tiếp
+cho độ chính xác — nếu thấy quá chậm khi dùng thực tế, báo lại để mình
+lùi về mức trung gian (vòng 5, ~2.6MB) thay vì mức tối đa này.
+
+## Vòng nâng cấp thứ 7 — Sửa heatmap xấu + population không có thông tin
+
+### Heatmap dân số — lỗi kỹ thuật đã tìm ra và sửa
+Đo thử phân bố giá trị thì phát hiện: nếu chuẩn hóa cường độ heatmap theo
+giá trị max (như code cũ làm), **89.3% điểm sẽ gần như vô hình** — vì dân
+số đô thị phân bố kiểu lũy thừa (rất ít điểm cực đông, còn lại thưa dần),
+chuẩn hóa tuyến tính theo max khiến cả thành phố trông trống trơn trừ vài
+chấm sáng. Đã sửa 3 điều trong `MapView.jsx`:
+1. Gộp 497.000 điểm gốc xuống còn ~17.000 điểm đại diện (gộp khối 6x6 ô)
+   — trước đây nạp thẳng 497K điểm vào plugin heatmap chắc chắn giật/lag.
+2. Chuẩn hóa theo percentile 95 (không phải max tuyệt đối) + biến đổi căn
+   bậc hai — tỷ lệ điểm "vô hình" giảm từ 89.3% xuống còn 15.6%.
+3. Đổi gradient từ tông màu đất (dễ nhìn đục) sang thang nhiệt chuẩn
+   xanh dương→xanh lá→vàng→cam→đỏ, dễ đọc trực quan hơn.
+
+### Phần dân số — từ "không thể hiện gì" thành có xu hướng thật
+Trước: chỉ có 1 biểu đồ 3 cột so sánh (điểm đo / phường / thành phố),
+giấu sau 1 cú click nhỏ dễ bị bỏ qua. Giờ (`populationStats.js`,
+`OneHealthCard.jsx`), mặc định hiện luôn khi có kết quả:
+- **Percentile badge** — "đông dân hơn X% khu vực TP.HCM đã đo" (dễ hiểu
+  hơn nhiều so với con số "217.6 người/ô" trần trụi không có bối cảnh).
+- **Biểu đồ xu hướng mật độ theo khoảng cách** (200m/500m/1km/2km/3km) —
+  đây là biểu đồ **xu hướng thật** bạn yêu cầu, tính trực tiếp từ lưới
+  dân số 100m mới có, chạy trong 5-6ms.
+- Giữ biểu đồ so sánh 3 cột cũ làm thông tin phụ.
+
+Test thử với 2 điểm để kiểm chứng logic hợp lý: Q1 (đông dân hơn 96% TP,
+mật độ tương đối phẳng theo bán kính vì cả khu vực đều đông) vs Củ Chi
+(đông dân hơn 38% TP, mật độ tăng dần theo bán kính — hợp lý vì điểm đo
+nằm ở vùng thưa nhưng gần trung tâm xã hơn khi mở rộng bán kính).
