@@ -323,3 +323,43 @@ trước, Excel export vẫn hoạt động, header/row vẫn khớp 964 cột.
 
 **Tổng bundle JS giờ chỉ còn ~3.1MB** (chủ yếu do `roads.js`/`sources.js`
 gốc, không phải phần One Health mới) — không còn nguy cơ OOM khi build.
+
+## Vòng nâng cấp thứ 9 — Đa dạng biểu đồ cho nhiều biến + tương quan + OSM
+
+Trước đây chỉ có population có biểu đồ. Giờ thêm 3 mảng mới, dùng 3 loại
+chart khác nhau (đúng yêu cầu "đa dạng"):
+
+### 1. Distance Trends (`DistanceTrendsGrid.jsx`, `gridStats.js`)
+Tổng quát hóa hàm distance-profile (trước chỉ dùng cho dân số) để áp dụng
+cho BẤT KỲ lớp nào trong 13 lớp — hiện đang chọn 5 biến tiêu biểu
+(Population, NO2, Land Temp, Tree Cover, Built-up), mỗi biến 1 mini line
+chart riêng. Tự động báo "Grid too coarse" thay vì hiện `undefined` khi
+bán kính nhỏ hơn độ phân giải lưới (ví dụ NO2 ở 200m).
+
+### 2. City-wide Correlations (`CorrelationPanel.jsx`)
+Tính hệ số tương quan Pearson thật (không phải minh họa) giữa 6 cặp biến
+có ý nghĩa One Health, lấy mẫu từ toàn bộ lưới thành phố:
+
+| Cặp biến | r | Diễn giải |
+|---|---|---|
+| NO2 vs Built-up | +0.50 | Đô thị hóa đi cùng ô nhiễm giao thông/công nghiệp |
+| LST vs Tree Cover | -0.36 | **Xác nhận hiệu ứng đảo nhiệt đô thị** — cây xanh làm mát |
+| Population vs NO2 | +0.55 | Gánh nặng phơi nhiễm — vùng đông dân hứng ô nhiễm nhiều hơn |
+| Built-up vs Elevation | +0.08 | Gần như không liên quan (hợp lý, TP.HCM khá bằng phẳng) |
+| Water vs LST | -0.17 | Mặt nước có hiệu ứng làm mát yếu |
+| Night Lights vs Population | +0.25 | Hoạt động kinh tế theo dân số, tương quan yếu-vừa |
+
+**Cảnh báo khoa học quan trọng đã ghi rõ trong UI:** đây là tương quan
+**sinh thái** (ecological, theo ô lưới) chứ không phải tương quan cá
+nhân — không suy luận được cho từng người/hộ gia đình cụ thể, và tương
+quan không phải nhân quả (2 biến có thể cùng phụ thuộc 1 yếu tố thứ 3
+như mật độ đường). Đây là loại cảnh báo bắt buộc phải có khi trình bày
+tương quan dữ liệu sức khỏe/môi trường — thiếu nó rất dễ gây hiểu lầm.
+
+### 3. OSM Proximity Radar (`SourceExposureRadar.jsx`)
+Biểu đồ radar (loại hoàn toàn khác 2 loại trên) — điểm "gần gũi" 0-100
+cho 2 nhóm category OSM: Rủi ro/Ô nhiễm (industrial, landfill, wastewater,
+fuel, market, butcher, farm) và Tiện ích/Xanh (park, forest, school,
+clinic, hospital, veterinary, recreation, publicinfra). Test với chợ Bến
+Thành ra đúng logic: chợ/công viên/bệnh viện gần → điểm 78-98; trại chăn
+nuôi/thú y xa → điểm 0.

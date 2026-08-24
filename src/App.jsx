@@ -22,6 +22,9 @@ import { findWard } from "./wards.js";
 import { MapView } from "./MapView.jsx";
 import { OneHealthCard } from "./OneHealthCard.jsx";
 import { DataSourcesTable } from "./DataSourcesTable.jsx";
+import { DistanceTrendsGrid } from "./DistanceTrendsGrid.jsx";
+import { CorrelationPanel } from "./CorrelationPanel.jsx";
+import { SourceExposureRadar } from "./SourceExposureRadar.jsx";
 import { color, font, card, inp, eyebrow, buttonPrimary, topographicSvgDataUri } from "./theme.js";
 import { Readout, IconChip, SectionHeader, StatusDot, Icon, CAT_ICON } from "./ui.jsx";
 
@@ -557,6 +560,15 @@ export default function App() {
             loading={envLoading}
             point={result.geo}
           />
+
+          {/* Distance-decay trends across multiple variables (not just population) */}
+          <DistanceTrendsGrid point={result.geo} />
+
+          {/* OSM proximity radar — visually distinct chart type */}
+          <SourceExposureRadar closestByCat={result.closestByCat} />
+
+          {/* City-wide correlation analysis between environmental variables */}
+          <CorrelationPanel />
 
           {/* Full data provenance / resolution disclosure */}
           <DataSourcesTable />
